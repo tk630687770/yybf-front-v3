@@ -5,13 +5,13 @@
     <section class="bg-bg-card rounded-lg p-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 class="text-lg font-bold text-text-primary">模型预测/诊断结果台</h1>
+          <h1 class="text-lg font-bold text-text-primary">{{ pageTitle }}</h1>
           <p class="mt-1 text-xs text-text-secondary">
-            先看当前预测，再保存证据快照；开奖后用快照复盘和漏号诊断判断模型是否真的进步。
+            {{ pageSubtitle }}
           </p>
         </div>
         <div class="action-groups">
-          <div class="action-group">
+          <div v-if="isPredictionPage" class="action-group">
             <span class="action-title">预测</span>
             <button
               :disabled="loading"
@@ -28,26 +28,10 @@
               返回实时预测
             </button>
           </div>
-          <div class="action-group">
-            <span class="action-title">同步</span>
-            <button
-              :disabled="drawLoading"
-              class="action-button"
-              @click="refreshDrawContext"
-            >
-              {{ drawLoading ? '同步中...' : '同步开奖/窗口' }}
-            </button>
-            <button
-              :disabled="axisSyncLoading"
-              class="action-button"
-              @click="syncAxisChains"
-            >
-              {{ axisSyncLoading ? '同步中...' : '同步坐标结构链' }}
-            </button>
-          </div>
-          <div class="action-group">
+          <div v-if="isPredictionPage || isReviewPage" class="action-group">
             <span class="action-title">快照</span>
             <button
+              v-if="isPredictionPage"
               :disabled="loading || saving || !finalPredict || !singlePlan"
               class="action-button"
               @click="saveSnapshot"
@@ -55,6 +39,7 @@
               {{ saving ? '保存中...' : '保存快照' }}
             </button>
             <button
+              v-if="isReviewPage"
               :disabled="snapshotLoading"
               class="action-button"
               @click="loadLatestSnapshots()"
@@ -62,8 +47,8 @@
               {{ snapshotLoading ? '读取中...' : '读取快照' }}
             </button>
           </div>
-          <div class="action-group">
-            <span class="action-title">复盘诊断</span>
+          <div v-if="isReviewPage" class="action-group">
+            <span class="action-title">复盘</span>
             <button
               :disabled="reviewing || !activeSnapshot"
               class="action-button"
@@ -72,39 +57,56 @@
               {{ reviewing ? '复盘中...' : '重新复盘' }}
             </button>
             <button
-              :disabled="diagnosing || !activeSnapshot"
+              :disabled="diagnosticSnapshotLoading || !canSaveDiagnosticSnapshot"
               class="action-button"
-              @click="diagnoseActiveSnapshot"
+              @click="saveDiagnosticReviewPack"
             >
-              {{ diagnosing ? '诊断中...' : '单期漏号诊断' }}
+              {{ diagnosticSnapshotLoading ? '保存中...' : '保存诊断包' }}
+            </button>
+          </div>
+          <div v-if="isDiagnosticPage" class="action-group">
+            <span class="action-title">复盘诊断</span>
+            <button
+              :disabled="diagnosing || !activeSnapshot"
+              :class="['action-button', { 'action-button-active': redMissDiagnosis }]"
+              @click="toggleRedMissDiagnosis"
+            >
+              {{ diagnosing ? '诊断中...' : redMissDiagnosis ? '关闭单期漏号诊断' : '单期漏号诊断' }}
             </button>
             <button
               :disabled="trendLoading"
-              class="action-button"
-              @click="loadReviewTrend"
+              :class="['action-button', { 'action-button-active': reviewTrend }]"
+              @click="toggleReviewTrend"
             >
-              {{ trendLoading ? '统计中...' : '多期复盘趋势' }}
+              {{ trendLoading ? '统计中...' : reviewTrend ? '关闭多期复盘趋势' : '多期复盘趋势' }}
             </button>
             <button
               :disabled="distributionLoading"
-              class="action-button"
-              @click="loadMissDistribution"
+              :class="['action-button', { 'action-button-active': redMissDistribution }]"
+              @click="toggleMissDistribution"
             >
-              {{ distributionLoading ? '统计中...' : '多期漏号统计' }}
+              {{ distributionLoading ? '统计中...' : redMissDistribution ? '关闭多期漏号统计' : '多期漏号统计' }}
             </button>
             <button
               :disabled="guardBacktestLoading"
-              class="action-button"
-              @click="loadGuardBacktest"
+              :class="['action-button', { 'action-button-active': isGuardBacktestOpen }]"
+              @click="toggleGuardBacktest"
             >
-              {{ guardBacktestLoading ? '回测中...' : '保底扩展回测' }}
+              {{ guardBacktestLoading ? '回测中...' : isGuardBacktestOpen ? '关闭保底扩展回测' : '保底扩展回测' }}
+            </button>
+            <button
+              :disabled="guardBacktestLoading"
+              :class="['action-button', { 'action-button-active': isGuardQuotaBacktestOpen }]"
+              @click="toggleGuardQuotaBacktest"
+            >
+              {{ guardBacktestLoading ? '回测中...' : isGuardQuotaBacktestOpen ? '关闭配额保底回测' : '配额保底回测' }}
             </button>
             <button
               :disabled="bayesLoading"
-              class="action-button"
-              @click="loadBayesDiagnosis"
+              :class="['action-button', { 'action-button-active': bayesDiagnosis }]"
+              @click="toggleBayesDiagnosis"
             >
-              {{ bayesLoading ? '诊断中...' : '贝叶斯冷热' }}
+              {{ bayesLoading ? '诊断中...' : bayesDiagnosis ? '关闭贝叶斯冷热' : '贝叶斯冷热' }}
             </button>
           </div>
         </div>
@@ -157,9 +159,6 @@
           >
             {{ axisSyncLoading ? '同步中...' : '同步坐标结构链' }}
           </button>
-          <RouterLink to="/window-console" class="action-button action-link">
-            去基础窗口操作台
-          </RouterLink>
         </div>
       </div>
 
@@ -218,7 +217,7 @@
     </section>
 
     <!-- 最近预测快照列表 -->
-    <section class="bg-bg-card rounded-lg p-4">
+    <section v-if="isReviewPage" class="bg-bg-card rounded-lg p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">最近预测快照</h2>
         <span class="text-xs text-text-secondary">点击快照可切换到历史快照模式</span>
@@ -273,7 +272,7 @@
     </section>
 
     <!-- 红球贝叶斯冷热诊断：单号动态修正观察，不直接改变正式预测 -->
-    <section v-if="bayesDiagnosis" class="bg-bg-card rounded-lg p-4">
+    <section v-if="isDiagnosticPage && bayesDiagnosis" class="bg-bg-card rounded-lg p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-bold text-text-primary">红球贝叶斯冷热诊断</h2>
@@ -368,7 +367,7 @@
     </section>
 
     <!-- 多期复盘趋势：用已复盘快照判断模型是否沿着正确方向进步 -->
-    <section v-if="reviewTrend" class="bg-bg-card rounded-lg p-4">
+    <section v-if="isDiagnosticPage && reviewTrend" class="bg-bg-card rounded-lg p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-bold text-text-primary">多期复盘趋势</h2>
@@ -500,7 +499,7 @@
     </section>
 
     <!-- 红球漏号分布统计 -->
-    <section v-if="redMissDistribution" class="bg-bg-card rounded-lg p-4">
+    <section v-if="isDiagnosticPage && redMissDistribution" class="bg-bg-card rounded-lg p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球漏号分布统计</h2>
         <span class="text-xs text-text-secondary">已复盘快照：{{ redMissDistribution.snapshotCount }}</span>
@@ -567,9 +566,9 @@
     </section>
 
     <!-- 红球候选池保底扩展回测 -->
-    <section v-if="guardBacktest" class="bg-bg-card rounded-lg p-4">
+    <section v-if="isDiagnosticPage && guardBacktest" class="bg-bg-card rounded-lg p-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-bold text-text-primary">红球候选池保底扩展回测</h2>
+        <h2 class="text-base font-bold text-text-primary">{{ guardBacktestTitle }}</h2>
         <span class="text-xs text-text-secondary">
           统计期数：{{ guardBacktest.periodCount }} / 扩展池上限：{{ guardBacktest.maxExpandedSize }}
         </span>
@@ -679,7 +678,7 @@
     </section>
 
     <!-- 红球候选池漏号诊断 -->
-    <section v-if="redMissDiagnosis" class="bg-bg-card rounded-lg p-4">
+    <section v-if="isDiagnosticPage && redMissDiagnosis" class="bg-bg-card rounded-lg p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球候选池漏号诊断</h2>
         <span class="text-xs text-text-secondary">快照ID：{{ redMissDiagnosis.snapshotId }}</span>
@@ -754,7 +753,7 @@
     </section>
 
     <!-- 当前预测主结论：只保留真正的票面结论，避免和红球/蓝球明细重复 -->
-    <section class="bg-bg-card rounded-lg p-4">
+    <section v-if="isPredictionPage || isReviewPage" class="bg-bg-card rounded-lg p-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">当前主推荐票面</h2>
         <span class="text-xs text-text-secondary">
@@ -798,7 +797,7 @@
     </section>
 
     <!-- 9+1复式方案：独立展示真正的9红+1蓝复式投注口径 -->
-    <details class="diagnosis-collapse bg-bg-card rounded-lg p-4" open>
+    <details v-if="isPredictionPage || isReviewPage" class="diagnosis-collapse bg-bg-card rounded-lg p-4" open>
       <summary class="diagnosis-summary">
         <div>
           <h2 class="text-base font-bold text-text-primary">9+1复式方案</h2>
@@ -910,7 +909,7 @@
     </details>
 
     <!-- 10注6+1单式方案：独立投注方案，不等同于把9+1复式拆成10注 -->
-    <details class="diagnosis-collapse bg-bg-card rounded-lg p-4" open>
+    <details v-if="isPredictionPage || isReviewPage" class="diagnosis-collapse bg-bg-card rounded-lg p-4" open>
       <summary class="diagnosis-summary">
         <div>
           <h2 class="text-base font-bold text-text-primary">10注6+1单式方案</h2>
@@ -1039,7 +1038,7 @@
     </details>
 
     <!-- 候选依据：展示模型用于形成主推荐和票面榜的红球、蓝球评分来源 -->
-    <section v-if="finalPredict" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <section v-if="isPredictionPage && finalPredict" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
       <details class="diagnosis-collapse bg-bg-card rounded-lg p-4">
         <summary class="diagnosis-summary">
           <div>
@@ -1205,12 +1204,14 @@
  * 第一阶段先接入最终预测和10注6+1单式方案，后续继续扩展回测、诊断和复盘
  */
 import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
+import { useRoute } from 'vue-router';
 import { useLotteryStore } from '@/stores/lottery';
 import type { DrawRecord } from '@/types';
 import {
   diagnoseRedCandidateMiss,
   getRedBayesColdHotDiagnosis,
   getRedCandidateGuardBacktest,
+  getRedCandidateGuardQuotaBacktest,
   getPredictionReviewTrend,
   getRedCandidateMissDistribution,
   getLatestPredictionSnapshots,
@@ -1219,6 +1220,7 @@ import {
   getPredictionSnapshotsByQiHao,
   getSingleTicketPlanPredict,
   reviewPredictionSnapshot,
+  savePredictionDiagnosticReviewPack,
   savePredictionSnapshot,
   syncDefaultAxisChains,
   syncRed10AxisChain,
@@ -1238,6 +1240,7 @@ import {
 } from '@/api/modules/modelPrediction';
 
 const lotteryStore = useLotteryStore();
+const route = useRoute();
 const loading = ref(false);
 const saving = ref(false);
 const snapshotLoading = ref(false);
@@ -1247,6 +1250,7 @@ const trendLoading = ref(false);
 const distributionLoading = ref(false);
 const guardBacktestLoading = ref(false);
 const bayesLoading = ref(false);
+const diagnosticSnapshotLoading = ref(false);
 const drawLoading = ref(false);
 const axisSyncLoading = ref(false);
 const reviewingSnapshotId = ref<number | null>(null);
@@ -1264,10 +1268,89 @@ const reviewTrend = ref<PredictionSnapshotTrendResult | null>(null);
 const redMissDiagnosis = ref<RedCandidateMissDiagnosisResult | null>(null);
 const redMissDistribution = ref<RedCandidateMissDistributionResult | null>(null);
 const guardBacktest = ref<RedCandidateGuardBacktestResult | null>(null);
+const guardBacktestTitle = ref('红球候选池保底扩展回测');
 const bayesDiagnosis = ref<RedBayesDiagnosisResult | null>(null);
 const axisSyncResults = ref<WindowAxisChainResult[]>([]);
 const snapshots = ref<PredictionSnapshotEntity[]>([]);
 const viewMode = ref<'realtime' | 'snapshot'>('realtime');
+
+/**
+ * 是否已打开普通保底扩展回测结果。
+ * @description 普通保底和配额保底共用一个结果区域，因此需要用标题区分当前打开的是哪一种结果。
+ */
+const isGuardBacktestOpen = computed(() => {
+  return Boolean(guardBacktest.value && guardBacktestTitle.value === '红球候选池保底扩展回测');
+});
+
+/**
+ * 是否已打开保底来源配额回测结果。
+ */
+const isGuardQuotaBacktestOpen = computed(() => {
+  return Boolean(guardBacktest.value && guardBacktestTitle.value === '红球候选池保底来源配额回测');
+});
+
+/**
+ * 当前模型工作台页面模式。
+ * @description 三个页面复用同一个组件，但通过路由名称区分预测、复盘和诊断职责。
+ */
+const pageMode = computed<'prediction' | 'review' | 'diagnostic'>(() => {
+  if (route.name === 'SnapshotReview') {
+    return 'review';
+  }
+  if (route.name === 'DiagnosticLab') {
+    return 'diagnostic';
+  }
+  return 'prediction';
+});
+
+/**
+ * 是否为实时预测台。
+ */
+const isPredictionPage = computed(() => pageMode.value === 'prediction');
+
+/**
+ * 是否为快照复盘台。
+ */
+const isReviewPage = computed(() => pageMode.value === 'review');
+
+/**
+ * 是否为诊断研究台。
+ */
+const isDiagnosticPage = computed(() => pageMode.value === 'diagnostic');
+
+/**
+ * 当前页面标题。
+ */
+const pageTitle = computed(() => {
+  if (isReviewPage.value) {
+    return '快照复盘台';
+  }
+  if (isDiagnosticPage.value) {
+    return '诊断研究台';
+  }
+  return '实时预测台';
+});
+
+/**
+ * 当前页面职责说明。
+ */
+const pageSubtitle = computed(() => {
+  if (isReviewPage.value) {
+    return '开奖后读取预测快照，在原票面上完成命中、奖级、收益和诊断包保存。';
+  }
+  if (isDiagnosticPage.value) {
+    return '集中运行趋势、漏号、贝叶斯、保底扩展和配额回测，判断模型是否真的进步。';
+  }
+  return '开奖前查看主推荐、9+1复式、10注6+1单式，并保存下一期开奖前证据快照。';
+});
+
+/**
+ * 是否允许把当前复盘上下文保存为诊断包。
+ * @description 诊断包是开奖后的研究证据，只在选中快照且已有复盘结果时开放保存。
+ */
+const canSaveDiagnosticSnapshot = computed(() => {
+  return Boolean(activeSnapshot.value && (activeSnapshot.value.reviewStatus === 1 || reviewResult.value));
+});
 
 /**
  * 当前前端快照模型版本。
@@ -1866,6 +1949,18 @@ async function loadReviewTrend() {
 }
 
 /**
+ * 切换多期快照复盘趋势区域
+ */
+async function toggleReviewTrend() {
+  if (reviewTrend.value) {
+    reviewTrend.value = null;
+    showMessage('已关闭多期复盘趋势', 'success');
+    return;
+  }
+  await loadReviewTrend();
+}
+
+/**
  * 加载红球贝叶斯冷热诊断
  */
 async function loadBayesDiagnosis() {
@@ -1882,6 +1977,50 @@ async function loadBayesDiagnosis() {
     showMessage(err instanceof Error ? err.message : '贝叶斯冷热诊断失败', 'error');
   } finally {
     bayesLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球贝叶斯冷热诊断区域
+ * @description 已打开时再次点击只关闭页面结果，不重新请求后端。
+ */
+async function toggleBayesDiagnosis() {
+  if (bayesDiagnosis.value) {
+    bayesDiagnosis.value = null;
+    showMessage('已关闭贝叶斯冷热诊断', 'success');
+    return;
+  }
+  await loadBayesDiagnosis();
+}
+
+/**
+ * 保存当前快照的复盘诊断包
+ * @description 一次性沉淀复盘趋势、漏号分布、保底扩展回测和当前贝叶斯冷热，供后续研究复查。
+ */
+async function saveDiagnosticReviewPack() {
+  if (!activeSnapshot.value) {
+    showMessage('请先选择一个已复盘快照，再保存诊断包', 'error');
+    return;
+  }
+  if (!canSaveDiagnosticSnapshot.value) {
+    showMessage('当前快照尚未复盘，请先复盘后再保存诊断包', 'error');
+    return;
+  }
+
+  diagnosticSnapshotLoading.value = true;
+  message.value = '';
+  try {
+    const res = await savePredictionDiagnosticReviewPack(activeSnapshot.value.id, 20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '保存诊断包失败');
+    }
+
+    const typeText = (res.data ?? []).map(item => item.diagnosticType).join('、');
+    showMessage(`诊断包保存成功：${typeText || '复盘趋势、漏号分布、保底扩展、贝叶斯冷热'}`, 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '保存诊断包失败，请确认后端已重启到最新代码', 'error');
+  } finally {
+    diagnosticSnapshotLoading.value = false;
   }
 }
 
@@ -1933,7 +2072,13 @@ async function loadPredictionInternal(useExistingSnapshot: boolean) {
     if (useExistingSnapshot) {
       const matchedSnapshot = await findLatestSnapshotByPredictQiHao(finalRes.data.predictQiHao);
       if (matchedSnapshot) {
-        loadSnapshotToPage(matchedSnapshot);
+        if (isReviewPage.value) {
+          loadSnapshotToPage(matchedSnapshot);
+        } else {
+          activeSnapshot.value = matchedSnapshot;
+          latestSnapshot.value = matchedSnapshot;
+          reviewResult.value = parseSnapshotJson<PredictionSnapshotReviewResult>(matchedSnapshot.reviewSummaryJson);
+        }
         await loadLatestSnapshots(false);
         showMessage(`已找到当前预测期号的已保存快照：ID ${matchedSnapshot.id}`, 'success');
         return;
@@ -2013,6 +2158,18 @@ async function loadMissDistribution() {
 }
 
 /**
+ * 切换多期漏号统计区域
+ */
+async function toggleMissDistribution() {
+  if (redMissDistribution.value) {
+    redMissDistribution.value = null;
+    showMessage('已关闭多期漏号统计', 'success');
+    return;
+  }
+  await loadMissDistribution();
+}
+
+/**
  * 加载红球候选池保底扩展回测
  */
 async function loadGuardBacktest() {
@@ -2024,12 +2181,58 @@ async function loadGuardBacktest() {
       throw new Error(res.msg || '保底扩展回测失败');
     }
     guardBacktest.value = res.data;
+    guardBacktestTitle.value = '红球候选池保底扩展回测';
     showMessage('保底扩展回测完成，详细结论见下方回测区域', 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '保底扩展回测失败', 'error');
   } finally {
     guardBacktestLoading.value = false;
   }
+}
+
+/**
+ * 切换红球候选池保底扩展回测区域
+ */
+async function toggleGuardBacktest() {
+  if (isGuardBacktestOpen.value) {
+    guardBacktest.value = null;
+    showMessage('已关闭保底扩展回测', 'success');
+    return;
+  }
+  await loadGuardBacktest();
+}
+
+/**
+ * 加载红球候选池保底来源配额回测
+ */
+async function loadGuardQuotaBacktest() {
+  guardBacktestLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateGuardQuotaBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '保底来源配额回测失败');
+    }
+    guardBacktest.value = res.data;
+    guardBacktestTitle.value = '红球候选池保底来源配额回测';
+    showMessage('保底来源配额回测完成，详细结论见下方回测区域', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '保底来源配额回测失败', 'error');
+  } finally {
+    guardBacktestLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球候选池保底来源配额回测区域
+ */
+async function toggleGuardQuotaBacktest() {
+  if (isGuardQuotaBacktestOpen.value) {
+    guardBacktest.value = null;
+    showMessage('已关闭配额保底回测', 'success');
+    return;
+  }
+  await loadGuardQuotaBacktest();
 }
 
 /**
@@ -2170,6 +2373,18 @@ async function diagnoseActiveSnapshot() {
   } finally {
     diagnosing.value = false;
   }
+}
+
+/**
+ * 切换当前历史快照的红球漏号诊断区域
+ */
+async function toggleRedMissDiagnosis() {
+  if (redMissDiagnosis.value) {
+    redMissDiagnosis.value = null;
+    showMessage('已关闭单期漏号诊断', 'success');
+    return;
+  }
+  await diagnoseActiveSnapshot();
 }
 
 /**
@@ -2362,6 +2577,16 @@ onMounted(async () => {
 .action-button-primary {
   background: var(--color-accent);
   color: #ffffff;
+}
+
+.action-button-active {
+  border-color: rgba(34, 197, 94, 0.9);
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.action-button-active:hover {
+  background: rgba(34, 197, 94, 0.28);
 }
 
 .action-link {

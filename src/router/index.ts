@@ -23,10 +23,26 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '基础窗口操作台' } // 页面标题
   },
   {
-    path: '/model-dashboard',          // 模型预测/诊断结果台路径
-    name: 'ModelDashboard',            // 模型预测/诊断结果台路由名称
-    component: ModelDashboard,         // 模型预测/诊断结果台组件
-    meta: { title: '模型预测/诊断结果台' } // 页面标题
+    path: '/prediction-console',       // 实时预测台路径
+    name: 'PredictionConsole',         // 实时预测台路由名称
+    component: ModelDashboard,         // 复用模型页面组件，通过路由名称切换页面模式
+    meta: { title: '实时预测台' }        // 页面标题
+  },
+  {
+    path: '/snapshot-review',          // 快照复盘台路径
+    name: 'SnapshotReview',            // 快照复盘台路由名称
+    component: ModelDashboard,         // 复用模型页面组件，通过路由名称切换页面模式
+    meta: { title: '快照复盘台' }       // 页面标题
+  },
+  {
+    path: '/diagnostic-lab',           // 诊断研究台路径
+    name: 'DiagnosticLab',             // 诊断研究台路由名称
+    component: ModelDashboard,         // 复用模型页面组件，通过路由名称切换页面模式
+    meta: { title: '诊断研究台' }       // 页面标题
+  },
+  {
+    path: '/model-dashboard',          // 旧模型结果台路径
+    redirect: '/prediction-console'    // 兼容旧入口，默认进入实时预测台
   }
 ];
 

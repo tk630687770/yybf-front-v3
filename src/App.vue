@@ -1,7 +1,7 @@
 <template>
   <!-- 根容器，设置全屏背景色和文字颜色 -->
   <div class="min-h-screen bg-bg-primary text-text-primary">
-    <!-- 顶部模块导航，用于区分基础窗口操作台和模型预测/诊断结果台 -->
+    <!-- 顶部模块导航，用于区分基础窗口、预测、复盘和诊断研究台 -->
     <header class="sticky top-0 z-50 bg-bg-card border-b border-bg-secondary">
       <div class="px-4 py-2 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -17,11 +17,25 @@
             基础窗口操作台
           </RouterLink>
           <RouterLink
-            to="/model-dashboard"
+            to="/prediction-console"
             class="nav-link"
             active-class="nav-link-active"
           >
-            模型预测/诊断结果台
+            实时预测台
+          </RouterLink>
+          <RouterLink
+            to="/snapshot-review"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            快照复盘台
+          </RouterLink>
+          <RouterLink
+            to="/diagnostic-lab"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            诊断研究台
           </RouterLink>
         </nav>
       </div>

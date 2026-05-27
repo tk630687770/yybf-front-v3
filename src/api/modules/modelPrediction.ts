@@ -354,6 +354,25 @@ export interface PredictionSnapshotTrendResult {
 }
 
 /**
+ * 预测诊断快照记录
+ */
+export interface PredictionDiagnosticSnapshotEntity {
+  id: number;                       // 诊断快照ID
+  predictQiHao: string;             // 预测期号
+  snapshotId: number | null;        // 关联的预测快照ID；当前态诊断可以为空
+  diagnosticType: string;           // 诊断类型
+  diagnosticName: string;           // 诊断名称
+  modelVersion: string;             // 预测模型版本
+  diagnosticVersion: string;        // 诊断口径版本
+  createTime: string;               // 保存时间
+  parameterJson?: string;           // 诊断参数JSON
+  dataJson?: string;                // 诊断结果JSON
+  summaryJson?: string;             // 诊断摘要JSON
+  inputHash?: string;               // 输入哈希
+  remark?: string;                  // 备注
+}
+
+/**
  * 红球漏号诊断中的单窗口状态
  */
 export interface RedCandidateMissWindowState {
@@ -643,6 +662,25 @@ export async function getPredictionReviewTrend(
 }
 
 /**
+ * 保存复盘诊断包
+ * @param snapshotId 需要沉淀诊断证据的预测快照ID
+ * @param recentLimit 多期统计使用的最近期数
+ * @returns 本次保存的诊断快照记录
+ */
+export async function savePredictionDiagnosticReviewPack(
+  snapshotId: number,
+  recentLimit = 20
+): Promise<ApiResponse<PredictionDiagnosticSnapshotEntity[]>> {
+  return request.post('/ssq/window/axis/prediction/diagnostic-snapshot/save-review-pack', null, {
+    params: {
+      snapshotId,
+      recentLimit,
+      replaceSameType: true
+    }
+  });
+}
+
+/**
  * 诊断指定快照的红球候选池漏号情况
  * @param snapshotId 快照ID
  * @returns 红球候选池漏号诊断结果
@@ -682,6 +720,27 @@ export async function getRedCandidateGuardBacktest(
       maxExpandedSize: 20,
       bayesTopLimit: 5,
       lowLevelLimit: 4
+    }
+  });
+}
+
+/**
+ * 回测红球候选池保底来源配额效果
+ * @param recentLimit 最近预测期数量
+ * @returns 带来源配额的保底扩展回测结果
+ */
+export async function getRedCandidateGuardQuotaBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateGuardBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/guard-quota-backtest', {
+    params: {
+      recentLimit,
+      maxExpandedSize: 20,
+      repeatQuota: 3,
+      neighborQuota: 3,
+      bayesQuota: 3,
+      lowLevelQuota: 2,
+      thirdAreaQuota: 2
     }
   });
 }
