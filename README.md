@@ -66,6 +66,12 @@ VITE_API_BASE_URL=http://localhost:8000
 
 详见 `docs/project-structure.md`
 
+## 协作与开发流程
+
+- 前端协作规则：`AGENTS.md`
+- 开发流程与进度：`docs/frontend-development-workflow.md`
+- 模块拆分规划：`docs/frontend-module-plan.md`
+
 ## 数据库说明
 
 - 数据库名称：ssqDB

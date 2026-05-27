@@ -44,7 +44,7 @@ yybf-front-v3/
 │   ├── views/                  # 页面组件
 │   │   ├── Home.vue           # 首页占位组件
 │   │   ├── WindowConsole.vue  # 基础窗口操作台页面
-│   │   └── ModelDashboard.vue # 模型预测/诊断结果台页面
+│   │   └── ModelDashboard.vue # 预测/复盘/诊断复用页面组件
 │   │
 │   ├── App.vue
 │   ├── main.ts
@@ -53,7 +53,9 @@ yybf-front-v3/
 │
 ├── docs/                       # 文档
 │   ├── project-structure.md
-│   └── frontend-module-plan.md # 前端模块拆分规划
+│   ├── frontend-development-workflow.md # 前端开发流程与进度
+│   ├── frontend-module-plan.md          # 前端模块拆分规划
+│   └── superpowers/                     # 阶段性设计与执行计划
 │
 ├── .skill-creator/             # AI 上下文/SKILL
 │   └── shuangseqiu-project.md  # 项目上下文文档
@@ -78,9 +80,10 @@ yybf-front-v3/
 | `src/types/index.ts` | TypeScript 类型定义 |
 | `src/views/Home.vue` | 首页占位组件，默认入口由路由重定向处理 |
 | `src/views/WindowConsole.vue` | 基础窗口操作台页面，承载开奖、窗口矩阵、模拟选择、窗口同步 |
-| `src/views/ModelDashboard.vue` | 模型预测/诊断结果台页面，承载红蓝合并预测和10注6+1单式方案 |
+| `src/views/ModelDashboard.vue` | 预测/复盘/诊断复用页面组件，通过路由模式分别承载实时预测台、快照复盘台和诊断研究台 |
 | `src/api/modules/modelPrediction.ts` | 模型预测接口封装 |
 | `docs/frontend-module-plan.md` | 基础窗口操作台与模型预测/诊断结果台的拆分规划 |
+| `docs/frontend-development-workflow.md` | 前端开发流程、页面职责和进度记录 |
 
 ## 数据库结构（ssqDB）
 
