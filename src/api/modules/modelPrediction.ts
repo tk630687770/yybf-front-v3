@@ -489,6 +489,27 @@ export interface RedCandidateGuardSourceStat {
 }
 
 /**
+ * 红球候选池保底来源贡献统计
+ */
+export interface RedCandidateGuardSourceContribution {
+  sourceType: string;                     // 来源类型
+  sourceName: string;                     // 来源名称
+  candidateTimes: number;                 // 候选次数
+  addedTimes: number;                     // 新增次数
+  candidateHitTimes: number;              // 来源候选命中次数
+  addedHitTimes: number;                  // 新增并命中次数
+  rescuedHitTimes: number;                // 实际救回次数
+  blockedHitTimes: number;                // 命中但未进入扩展池次数
+  alreadyInBaseHitTimes: number;          // 命中但原池已包含次数
+  candidateHitRate: number;               // 候选命中率
+  addedHitRate: number;                   // 新增命中率
+  rescuedHitRate: number;                 // 救回命中率
+  rescuedNumbers: string[];               // 救回号码
+  blockedHitNumbers: string[];            // 命中但被挡号码
+  alreadyInBaseHitNumbers: string[];      // 命中但原池已含号码
+}
+
+/**
  * 单期红球候选池保底扩展回测明细
  */
 export interface RedCandidateGuardBacktestPeriod {
@@ -525,7 +546,189 @@ export interface RedCandidateGuardBacktestResult {
   averageAddedCount: number;                          // 平均每期新增数量
   maxExpandedSize: number;                            // 最大扩展池大小
   sourceStats: RedCandidateGuardSourceStat[];         // 来源统计
+  sourceContributionStats: RedCandidateGuardSourceContribution[]; // 来源贡献统计
   periods: RedCandidateGuardBacktestPeriod[];         // 单期明细
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 红球候选池保底来源配额网格单项
+ */
+export interface RedCandidateGuardQuotaGridOption {
+  rank: number;                                       // 排名
+  repeatQuota: number;                                // 上期重号配额
+  neighborQuota: number;                              // 上期邻号配额
+  bayesQuota: number;                                 // 贝叶斯Top配额
+  lowLevelQuota: number;                              // 低位冷补配额
+  thirdAreaQuota: number;                             // 三区后段配额
+  periodCount: number;                                // 纳入统计期数
+  actualRedCount: number;                             // 实际红球总数
+  baseHitCount: number;                               // 原候选池命中总数
+  expandedHitCount: number;                           // 扩展后命中总数
+  rescuedHitCount: number;                            // 救回红球总数
+  baseCoverageRate: number;                           // 原候选池覆盖率
+  expandedCoverageRate: number;                       // 扩展后覆盖率
+  coverageLift: number;                               // 覆盖率提升
+  improvedPeriodCount: number;                        // 有救回效果的期数
+  reachFourHitPeriodCount: number;                    // 达到4红覆盖的期数
+  reachFourHitRate: number;                           // 达到4红覆盖的比例
+  averageAddedCount: number;                          // 平均新增号码数
+  score: number;                                      // 网格排序观察分
+  quotaText: string;                                  // 配额描述
+  conclusion: string;                                 // 组合结论
+}
+
+/**
+ * 红球候选池保底来源配额网格回测结果
+ */
+export interface RedCandidateGuardQuotaGridBacktestResult {
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  periodCount: number;                                // 纳入统计期数
+  maxExpandedSize: number;                            // 最大扩展池大小
+  optionCount: number;                                // 实际测试组合数量
+  topLimit: number;                                   // 返回Top数量
+  baseCoverageRate: number;                           // 原候选池覆盖率
+  bestExpandedCoverageRate: number;                   // 最佳组合扩展覆盖率
+  bestCoverageLift: number;                           // 最佳组合覆盖提升
+  bestReachFourHitRate: number;                       // 最佳组合达到4红比例
+  bestOption?: RedCandidateGuardQuotaGridOption | null; // 最佳配额组合
+  topOptions: RedCandidateGuardQuotaGridOption[];     // 排名前列的配额组合
+  bestPeriods: RedCandidateGuardBacktestPeriod[];     // 最佳组合单期明细
+  bestSourceContributionStats: RedCandidateGuardSourceContribution[]; // 最佳组合来源贡献
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 扩展池压缩后生成的6红票面诊断明细
+ */
+export interface RedCandidateGuardCompressionTicket {
+  rank: number;                                       // 票面排名
+  redNumbers: string[];                               // 6个红球号码
+  redText: string;                                    // 票面红球文本
+  hitNumbers: string[];                               // 命中的真实红球
+  hitCount: number;                                   // 命中红球数量
+  score: number;                                      // 票面压缩评分
+  shapeText: string;                                  // 票面形态说明
+  reason: string;                                     // 选择原因
+}
+
+/**
+ * 单期扩展池压缩回测明细
+ */
+export interface RedCandidateGuardCompressionPeriod {
+  snapshotId: number;                                 // 快照ID
+  predictQiHao: string;                               // 预测期号
+  actualRedNumbers: string[];                         // 实际红球
+  basePool: string[];                                 // 原主候选池
+  expandedPool: string[];                             // 保底扩展池
+  compressedNinePool: string[];                       // 压缩后的9红观察池
+  baseHitNumbers: string[];                           // 原候选池命中
+  expandedHitNumbers: string[];                       // 扩展池命中
+  compressedHitNumbers: string[];                     // 9红观察池命中
+  originalSingleBestRedHitCount: number;              // 原正式10注最高命中
+  compressedTicketBestRedHitCount: number;            // 压缩10注最高命中
+  tickets: RedCandidateGuardCompressionTicket[];      // 压缩生成票面
+  conclusion: string;                                 // 单期结论
+}
+
+/**
+ * 红球保底扩展池压缩回测结果
+ */
+export interface RedCandidateGuardCompressionBacktestResult {
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  actualRedCount: number;                             // 实际红球总数
+  quotaText: string;                                  // 使用的保底配额
+  maxExpandedSize: number;                            // 扩展池最大大小
+  compressedRedSize: number;                          // 压缩后的红球数量
+  ticketLimit: number;                                // 生成票面数量
+  baseCoverageRate: number;                           // 原候选池覆盖率
+  expandedCoverageRate: number;                       // 扩展池覆盖率
+  compressedPoolCoverageRate: number;                 // 9红观察池覆盖率
+  compressedTicketCoverageRate: number;               // 压缩10注折算覆盖率
+  originalSingleTicketCoverageRate: number;           // 原正式10注折算覆盖率
+  compressedPoolReachFourCount: number;               // 9红达到4红期数
+  compressedTicketReachThreeCount: number;            // 10注达到3红期数
+  betterThanOriginalSingleCount: number;              // 优于原正式10注期数
+  periods: RedCandidateGuardCompressionPeriod[];      // 单期明细
+  sourceContributionStats: RedCandidateGuardSourceContribution[]; // 压缩输入池来源贡献
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 红球保底扩展池压缩策略网格中的单个策略结果
+ */
+export interface RedCandidateGuardCompressionGridOption {
+  rank: number;                                       // 排名
+  strategyCode: string;                               // 策略编码
+  strategyName: string;                               // 策略名称
+  strategyDescription: string;                        // 策略说明
+  score: number;                                      // 观察评分
+  baseCoverageRate: number;                           // 原候选池覆盖率
+  expandedCoverageRate: number;                       // 扩展池覆盖率
+  compressedPoolCoverageRate: number;                 // 压缩9红覆盖率
+  compressedTicketCoverageRate: number;               // 压缩10注折算覆盖率
+  originalSingleTicketCoverageRate: number;           // 原正式10注折算覆盖率
+  compressedPoolReachFourCount: number;               // 9红达到4红期数
+  compressedTicketReachThreeCount: number;            // 10注达到3红期数
+  betterThanOriginalSingleCount: number;              // 优于原正式10注期数
+  compressedRedSize: number;                          // 压缩红球数量
+  ticketLimit: number;                                // 生成票面数量
+}
+
+/**
+ * 红球保底扩展池压缩策略网格回测结果
+ */
+export interface RedCandidateGuardCompressionGridBacktestResult {
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  optionCount: number;                                // 测试策略数量
+  topLimit: number;                                   // 返回Top数量
+  quotaText: string;                                  // 使用的保底配额
+  bestOption?: RedCandidateGuardCompressionGridOption | null; // 最佳策略
+  topOptions: RedCandidateGuardCompressionGridOption[]; // 排名前列策略
+  bestPeriods: RedCandidateGuardCompressionPeriod[];  // 最佳策略单期明细
+  bestSourceContributionStats: RedCandidateGuardSourceContribution[]; // 最佳策略输入池来源贡献
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 红球保底扩展池压缩来源最低保留位网格中的单个策略结果
+ */
+export interface RedCandidateGuardCompressionRetentionGridOption {
+  rank: number;                                       // 排名
+  strategyCode: string;                               // 策略编码
+  strategyName: string;                               // 策略名称
+  strategyDescription: string;                        // 策略说明
+  retainText: string;                                 // 来源最低保留位描述
+  score: number;                                      // 观察评分
+  baseCoverageRate: number;                           // 原候选池覆盖率
+  expandedCoverageRate: number;                       // 扩展池覆盖率
+  compressedPoolCoverageRate: number;                 // 压缩9红覆盖率
+  compressedTicketCoverageRate: number;               // 压缩10注折算覆盖率
+  originalSingleTicketCoverageRate: number;           // 原正式10注折算覆盖率
+  compressedPoolReachFourCount: number;               // 9红达到4红期数
+  compressedTicketReachThreeCount: number;            // 10注达到3红期数
+  betterThanOriginalSingleCount: number;              // 优于原正式10注期数
+}
+
+/**
+ * 红球保底扩展池压缩来源最低保留位网格回测结果
+ */
+export interface RedCandidateGuardCompressionRetentionGridBacktestResult {
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  optionCount: number;                                // 测试策略数量
+  topLimit: number;                                   // 返回Top数量
+  quotaText: string;                                  // 使用的保底来源配额
+  bestOption?: RedCandidateGuardCompressionRetentionGridOption | null; // 最佳最低保留位策略
+  topOptions: RedCandidateGuardCompressionRetentionGridOption[]; // 排名前列策略
+  bestPeriods: RedCandidateGuardCompressionPeriod[];  // 最佳策略单期明细
+  bestSourceContributionStats: RedCandidateGuardSourceContribution[]; // 最佳策略输入池来源贡献
   conclusion: string;                                 // 回测结论
   suggestions: string[];                              // 下一步建议
 }
@@ -741,6 +944,94 @@ export async function getRedCandidateGuardQuotaBacktest(
       bayesQuota: 3,
       lowLevelQuota: 2,
       thirdAreaQuota: 2
+    }
+  });
+}
+
+/**
+ * 回测红球候选池保底来源配额网格
+ * @param recentLimit 最近预测期数量
+ * @returns 配额网格回测结果
+ */
+export async function getRedCandidateGuardQuotaGridBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateGuardQuotaGridBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/guard-quota-grid-backtest', {
+    params: {
+      recentLimit,
+      maxExpandedSize: 20,
+      topLimit: 20
+    }
+  });
+}
+
+/**
+ * 回测红球保底扩展池压缩效果
+ * @param recentLimit 最近预测期数量
+ * @returns 扩展池压缩回测结果
+ */
+export async function getRedCandidateGuardCompressionBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateGuardCompressionBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/guard-compression-backtest', {
+    params: {
+      recentLimit,
+      maxExpandedSize: 20,
+      repeatQuota: 3,
+      neighborQuota: 3,
+      bayesQuota: 3,
+      lowLevelQuota: 0,
+      thirdAreaQuota: 0,
+      compressedRedSize: 9,
+      ticketLimit: 10
+    }
+  });
+}
+
+/**
+ * 回测红球保底扩展池压缩策略网格
+ * @param recentLimit 最近预测期数量
+ * @returns 压缩策略网格回测结果
+ */
+export async function getRedCandidateGuardCompressionGridBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateGuardCompressionGridBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/guard-compression-grid-backtest', {
+    params: {
+      recentLimit,
+      maxExpandedSize: 20,
+      repeatQuota: 3,
+      neighborQuota: 3,
+      bayesQuota: 3,
+      lowLevelQuota: 0,
+      thirdAreaQuota: 0,
+      compressedRedSize: 9,
+      ticketLimit: 10,
+      topLimit: 10
+    }
+  });
+}
+
+/**
+ * 回测红球保底扩展池压缩来源最低保留位网格
+ * @param recentLimit 最近预测期数量
+ * @returns 压缩来源最低保留位网格回测结果
+ */
+export async function getRedCandidateGuardCompressionRetentionGridBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateGuardCompressionRetentionGridBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/guard-compression-retention-grid-backtest', {
+    params: {
+      recentLimit,
+      maxExpandedSize: 20,
+      repeatQuota: 3,
+      neighborQuota: 3,
+      bayesQuota: 3,
+      lowLevelQuota: 0,
+      thirdAreaQuota: 0,
+      compressedRedSize: 9,
+      ticketLimit: 10,
+      topLimit: 10
     }
   });
 }

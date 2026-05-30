@@ -102,6 +102,34 @@
               {{ guardBacktestLoading ? '回测中...' : isGuardQuotaBacktestOpen ? '关闭配额保底回测' : '配额保底回测' }}
             </button>
             <button
+              :disabled="guardQuotaGridLoading"
+              :class="['action-button', { 'action-button-active': guardQuotaGridBacktest }]"
+              @click="toggleGuardQuotaGridBacktest"
+            >
+              {{ guardQuotaGridLoading ? '回测中...' : guardQuotaGridBacktest ? '关闭配额网格回测' : '配额网格回测' }}
+            </button>
+            <button
+              :disabled="guardCompressionLoading"
+              :class="['action-button', { 'action-button-active': guardCompressionBacktest }]"
+              @click="toggleGuardCompressionBacktest"
+            >
+              {{ guardCompressionLoading ? '回测中...' : guardCompressionBacktest ? '关闭扩展池压缩' : '扩展池压缩回测' }}
+            </button>
+            <button
+              :disabled="guardCompressionGridLoading"
+              :class="['action-button', { 'action-button-active': guardCompressionGridBacktest }]"
+              @click="toggleGuardCompressionGridBacktest"
+            >
+              {{ guardCompressionGridLoading ? '回测中...' : guardCompressionGridBacktest ? '关闭压缩策略网格' : '压缩策略网格' }}
+            </button>
+            <button
+              :disabled="guardCompressionRetentionGridLoading"
+              :class="['action-button', { 'action-button-active': guardCompressionRetentionGridBacktest }]"
+              @click="toggleGuardCompressionRetentionGridBacktest"
+            >
+              {{ guardCompressionRetentionGridLoading ? '回测中...' : guardCompressionRetentionGridBacktest ? '关闭保留位回测' : '保留位回测' }}
+            </button>
+            <button
               :disabled="bayesLoading"
               :class="['action-button', { 'action-button-active': bayesDiagnosis }]"
               @click="toggleBayesDiagnosis"
@@ -643,6 +671,41 @@
         </div>
       </div>
 
+      <details v-if="guardSourceContributionStats.length" class="diagnosis-collapse mt-3">
+        <summary>
+          <span>来源贡献诊断</span>
+          <span>展开查看各来源救回、被挡和原池已含的真实命中情况</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>候选命中</th>
+                <th>新增命中</th>
+                <th>救回</th>
+                <th>被挡命中</th>
+                <th>原池已含</th>
+                <th>救回号码</th>
+                <th>被挡号码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardSourceContributionStats" :key="item.sourceType">
+                <td>{{ item.sourceName }}</td>
+                <td>{{ item.candidateHitTimes }}/{{ item.candidateTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
+                <td>{{ item.addedHitTimes }}/{{ item.addedTimes }} / {{ formatPercent(item.addedHitRate) }}</td>
+                <td class="font-bold text-accent">{{ item.rescuedHitTimes }} / {{ formatPercent(item.rescuedHitRate) }}</td>
+                <td class="text-yellow-400">{{ item.blockedHitTimes }}</td>
+                <td>{{ item.alreadyInBaseHitTimes }}</td>
+                <td class="table-note">{{ formatList(item.rescuedNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.blockedHitNumbers) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
       <div class="mt-3 overflow-auto">
         <table class="result-table">
           <thead>
@@ -674,6 +737,606 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- 红球候选池保底来源配额网格回测：批量比较不同来源配额组合，只作为观察线 -->
+    <section v-if="isDiagnosticPage && guardQuotaGridBacktest" class="bg-bg-card rounded-lg p-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold text-text-primary">红球候选池保底来源配额网格回测</h2>
+        <span class="text-xs text-text-secondary">
+          统计期数：{{ guardQuotaGridBacktest.periodCount }} / 测试组合：{{ guardQuotaGridBacktest.optionCount }}
+        </span>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">原候选池覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardQuotaGridBacktest.baseCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">最佳扩展覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(guardQuotaGridBacktest.bestExpandedCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">最佳覆盖提升</div>
+          <div class="summary-value text-yellow-400">{{ formatPercent(guardQuotaGridBacktest.bestCoverageLift) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">达到4红比例</div>
+          <div class="summary-value">{{ formatPercent(guardQuotaGridBacktest.bestReachFourHitRate) }}</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardQuotaGridBacktest.conclusion }}</p>
+
+      <div v-if="guardQuotaGridBacktest.bestOption" class="mt-3 summary-block">
+        <div class="summary-label">当前最佳配额组合</div>
+        <div class="summary-value">
+          {{ guardQuotaGridBacktest.bestOption.quotaText }}
+          <span class="text-text-secondary">
+            / 观察分 {{ formatScore(guardQuotaGridBacktest.bestOption.score) }}
+            / 救回 {{ guardQuotaGridBacktest.bestOption.rescuedHitCount }} 红
+          </span>
+        </div>
+      </div>
+
+      <details v-if="guardQuotaBestSourceContributionStats.length" class="diagnosis-collapse mt-3">
+        <summary>
+          <span>最佳配额来源贡献</span>
+          <span>展开查看最佳配额组合下，哪些来源救回或被挡</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>候选命中</th>
+                <th>新增命中</th>
+                <th>救回</th>
+                <th>被挡命中</th>
+                <th>原池已含</th>
+                <th>救回号码</th>
+                <th>被挡号码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardQuotaBestSourceContributionStats" :key="item.sourceType">
+                <td>{{ item.sourceName }}</td>
+                <td>{{ item.candidateHitTimes }}/{{ item.candidateTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
+                <td>{{ item.addedHitTimes }}/{{ item.addedTimes }} / {{ formatPercent(item.addedHitRate) }}</td>
+                <td class="font-bold text-accent">{{ item.rescuedHitTimes }} / {{ formatPercent(item.rescuedHitRate) }}</td>
+                <td class="text-yellow-400">{{ item.blockedHitTimes }}</td>
+                <td>{{ item.alreadyInBaseHitTimes }}</td>
+                <td class="table-note">{{ formatList(item.rescuedNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.blockedHitNumbers) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>配额组合</th>
+              <th>观察分</th>
+              <th>扩展覆盖率</th>
+              <th>覆盖提升</th>
+              <th>达到4红</th>
+              <th>救回</th>
+              <th>平均新增</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in guardQuotaGridBacktest.topOptions" :key="item.quotaText">
+              <td>{{ item.rank }}</td>
+              <td class="font-bold text-text-primary">{{ item.quotaText }}</td>
+              <td>{{ formatScore(item.score) }}</td>
+              <td>{{ formatPercent(item.expandedCoverageRate) }}</td>
+              <td>{{ formatPercent(item.coverageLift) }}</td>
+              <td>{{ item.reachFourHitPeriodCount }}/{{ item.periodCount }} / {{ formatPercent(item.reachFourHitRate) }}</td>
+              <td class="text-accent">{{ item.rescuedHitCount }}</td>
+              <td>{{ formatScore(item.averageAddedCount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 overflow-auto">
+        <div class="summary-label mb-2">最佳组合单期明细</div>
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>实际红球</th>
+              <th>原命中</th>
+              <th>扩展命中</th>
+              <th>救回</th>
+              <th>新增号码</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in guardQuotaGridBacktest.bestPeriods" :key="item.snapshotId">
+              <td>{{ item.predictQiHao }}</td>
+              <td>
+                <HitNumberList
+                  :numbers="item.actualRedNumbers"
+                  kind="red"
+                  :actual-red-numbers="item.rescuedNumbers"
+                />
+              </td>
+              <td>{{ item.baseHitCount }}红：{{ formatList(item.baseHitNumbers) }}</td>
+              <td>{{ item.expandedHitCount }}红：{{ formatList(item.expandedHitNumbers) }}</td>
+              <td class="font-bold text-accent">{{ formatList(item.rescuedNumbers) }}</td>
+              <td class="table-note">{{ formatList(item.addedNumbers) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in guardQuotaGridBacktest.suggestions" :key="item">- {{ item }}</p>
+      </div>
+    </section>
+
+    <!-- 红球保底扩展池压缩回测：观察扩展池能否压缩为9红池和10注6红票面 -->
+    <section v-if="isDiagnosticPage && guardCompressionBacktest" class="bg-bg-card rounded-lg p-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold text-text-primary">红球保底扩展池压缩回测</h2>
+        <span class="text-xs text-text-secondary">
+          配额：{{ guardCompressionBacktest.quotaText }} / 统计期数：{{ guardCompressionBacktest.periodCount }}
+        </span>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">原候选池覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardCompressionBacktest.baseCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">扩展池覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(guardCompressionBacktest.expandedCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩9红覆盖率</div>
+          <div class="summary-value text-yellow-400">{{ formatPercent(guardCompressionBacktest.compressedPoolCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩10注折算覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardCompressionBacktest.compressedTicketCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">原10注折算覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardCompressionBacktest.originalSingleTicketCoverageRate) }}</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardCompressionBacktest.conclusion }}</p>
+
+      <details v-if="guardCompressionSourceContributionStats.length" class="diagnosis-collapse mt-3">
+        <summary>
+          <span>压缩输入池来源贡献</span>
+          <span>展开查看进入压缩前的扩展池由哪些来源贡献</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>候选命中</th>
+                <th>新增命中</th>
+                <th>救回</th>
+                <th>被挡命中</th>
+                <th>原池已含</th>
+                <th>救回号码</th>
+                <th>被挡号码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardCompressionSourceContributionStats" :key="item.sourceType">
+                <td>{{ item.sourceName }}</td>
+                <td>{{ item.candidateHitTimes }}/{{ item.candidateTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
+                <td>{{ item.addedHitTimes }}/{{ item.addedTimes }} / {{ formatPercent(item.addedHitRate) }}</td>
+                <td class="font-bold text-accent">{{ item.rescuedHitTimes }} / {{ formatPercent(item.rescuedHitRate) }}</td>
+                <td class="text-yellow-400">{{ item.blockedHitTimes }}</td>
+                <td>{{ item.alreadyInBaseHitTimes }}</td>
+                <td class="table-note">{{ formatList(item.rescuedNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.blockedHitNumbers) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">9红达到4红期数</div>
+          <div class="summary-value">{{ guardCompressionBacktest.compressedPoolReachFourCount }}/{{ guardCompressionBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">10注达到3红期数</div>
+          <div class="summary-value">{{ guardCompressionBacktest.compressedTicketReachThreeCount }}/{{ guardCompressionBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">优于原10注期数</div>
+          <div class="summary-value">{{ guardCompressionBacktest.betterThanOriginalSingleCount }}/{{ guardCompressionBacktest.periodCount }}</div>
+        </div>
+      </div>
+
+      <div class="mt-3 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>实际红球</th>
+              <th>扩展命中</th>
+              <th>压缩9红池</th>
+              <th>压缩9红命中</th>
+              <th>压缩10注最好</th>
+              <th>原10注最好</th>
+              <th>结论</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in guardCompressionBacktest.periods" :key="item.snapshotId">
+              <td>{{ item.predictQiHao }}</td>
+              <td>
+                <HitNumberList
+                  :numbers="item.actualRedNumbers"
+                  kind="red"
+                  :actual-red-numbers="item.compressedHitNumbers"
+                />
+              </td>
+              <td>{{ item.expandedHitNumbers.length }}红：{{ formatList(item.expandedHitNumbers) }}</td>
+              <td class="table-note">{{ formatList(item.compressedNinePool) }}</td>
+              <td class="font-bold text-accent">{{ item.compressedHitNumbers.length }}红：{{ formatList(item.compressedHitNumbers) }}</td>
+              <td>{{ item.compressedTicketBestRedHitCount }}红</td>
+              <td>{{ item.originalSingleBestRedHitCount }}红</td>
+              <td class="table-note">{{ item.conclusion }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary>
+          <span>压缩10注票面明细</span>
+          <span>展开查看每期由压缩9红池生成的10注6红票面</span>
+        </summary>
+        <div class="mt-3 space-y-4">
+          <div v-for="period in guardCompressionBacktest.periods" :key="`${period.snapshotId}-tickets`" class="summary-block">
+            <div class="summary-label mb-2">{{ period.predictQiHao }} 压缩票面</div>
+            <div class="overflow-auto">
+              <table class="result-table">
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>红球票面</th>
+                    <th>命中</th>
+                    <th>形态</th>
+                    <th>评分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="ticket in period.tickets" :key="`${period.snapshotId}-${ticket.rank}`">
+                    <td>{{ ticket.rank }}</td>
+                    <td>
+                      <HitNumberList
+                        :numbers="ticket.redNumbers"
+                        kind="red"
+                        :actual-red-numbers="ticket.hitNumbers"
+                      />
+                    </td>
+                    <td>{{ ticket.hitCount }}红：{{ formatList(ticket.hitNumbers) }}</td>
+                    <td>{{ ticket.shapeText }}</td>
+                    <td>{{ formatScore(ticket.score) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in guardCompressionBacktest.suggestions" :key="item">- {{ item }}</p>
+      </div>
+    </section>
+
+    <!-- 红球保底扩展池压缩策略网格：比较不同压缩权重是否能减少扩展池压缩损失 -->
+    <section v-if="isDiagnosticPage && guardCompressionGridBacktest" class="bg-bg-card rounded-lg p-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold text-text-primary">红球保底扩展池压缩策略网格</h2>
+        <span class="text-xs text-text-secondary">
+          配额：{{ guardCompressionGridBacktest.quotaText }} / 策略数：{{ guardCompressionGridBacktest.optionCount }}
+        </span>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardCompressionGridBacktest.conclusion }}</p>
+
+      <div v-if="guardCompressionGridBacktest.bestOption" class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">最佳策略</div>
+          <div class="summary-value">{{ guardCompressionGridBacktest.bestOption.strategyName }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">观察评分</div>
+          <div class="summary-value">{{ formatScore(guardCompressionGridBacktest.bestOption.score) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩9红覆盖率</div>
+          <div class="summary-value text-yellow-400">{{ formatPercent(guardCompressionGridBacktest.bestOption.compressedPoolCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩10注覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardCompressionGridBacktest.bestOption.compressedTicketCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">优于原10注</div>
+          <div class="summary-value">{{ guardCompressionGridBacktest.bestOption.betterThanOriginalSingleCount }}/{{ guardCompressionGridBacktest.periodCount }}</div>
+        </div>
+      </div>
+
+      <details v-if="guardCompressionGridBestSourceContributionStats.length" class="diagnosis-collapse mt-3">
+        <summary>
+          <span>最佳压缩策略来源贡献</span>
+          <span>展开查看最佳压缩策略输入池的来源贡献</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>候选命中</th>
+                <th>新增命中</th>
+                <th>救回</th>
+                <th>被挡命中</th>
+                <th>原池已含</th>
+                <th>救回号码</th>
+                <th>被挡号码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardCompressionGridBestSourceContributionStats" :key="item.sourceType">
+                <td>{{ item.sourceName }}</td>
+                <td>{{ item.candidateHitTimes }}/{{ item.candidateTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
+                <td>{{ item.addedHitTimes }}/{{ item.addedTimes }} / {{ formatPercent(item.addedHitRate) }}</td>
+                <td class="font-bold text-accent">{{ item.rescuedHitTimes }} / {{ formatPercent(item.rescuedHitRate) }}</td>
+                <td class="text-yellow-400">{{ item.blockedHitTimes }}</td>
+                <td>{{ item.alreadyInBaseHitTimes }}</td>
+                <td class="table-note">{{ formatList(item.rescuedNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.blockedHitNumbers) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>策略</th>
+              <th>评分</th>
+              <th>9红覆盖</th>
+              <th>10注覆盖</th>
+              <th>原10注</th>
+              <th>9红达4红</th>
+              <th>10注达3红</th>
+              <th>优于原10注</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in guardCompressionGridBacktest.topOptions" :key="item.strategyCode">
+              <td>{{ item.rank }}</td>
+              <td class="font-bold text-text-primary">{{ item.strategyName }}</td>
+              <td>{{ formatScore(item.score) }}</td>
+              <td>{{ formatPercent(item.compressedPoolCoverageRate) }}</td>
+              <td>{{ formatPercent(item.compressedTicketCoverageRate) }}</td>
+              <td>{{ formatPercent(item.originalSingleTicketCoverageRate) }}</td>
+              <td>{{ item.compressedPoolReachFourCount }}/{{ guardCompressionGridBacktest.periodCount }}</td>
+              <td>{{ item.compressedTicketReachThreeCount }}/{{ guardCompressionGridBacktest.periodCount }}</td>
+              <td>{{ item.betterThanOriginalSingleCount }}/{{ guardCompressionGridBacktest.periodCount }}</td>
+              <td class="table-note">{{ item.strategyDescription }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary>
+          <span>最佳策略单期明细</span>
+          <span>展开查看最佳压缩策略每期保留了哪些红球</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>实际红球</th>
+                <th>扩展命中</th>
+                <th>压缩9红池</th>
+                <th>压缩命中</th>
+                <th>压缩10注最好</th>
+                <th>原10注最好</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardCompressionGridBacktest.bestPeriods" :key="`${item.snapshotId}-grid-best`">
+                <td>{{ item.predictQiHao }}</td>
+                <td>
+                  <HitNumberList
+                    :numbers="item.actualRedNumbers"
+                    kind="red"
+                    :actual-red-numbers="item.compressedHitNumbers"
+                  />
+                </td>
+                <td>{{ item.expandedHitNumbers.length }}红：{{ formatList(item.expandedHitNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.compressedNinePool) }}</td>
+                <td class="font-bold text-accent">{{ item.compressedHitNumbers.length }}红：{{ formatList(item.compressedHitNumbers) }}</td>
+                <td>{{ item.compressedTicketBestRedHitCount }}红</td>
+                <td>{{ item.originalSingleBestRedHitCount }}红</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in guardCompressionGridBacktest.suggestions" :key="item">- {{ item }}</p>
+      </div>
+    </section>
+
+    <!-- 红球保底扩展池压缩来源最低保留位网格：验证压缩阶段是否需要为某些来源保留最低名额 -->
+    <section v-if="isDiagnosticPage && guardCompressionRetentionGridBacktest" class="bg-bg-card rounded-lg p-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold text-text-primary">红球压缩层来源最低保留位网格</h2>
+        <span class="text-xs text-text-secondary">
+          配额：{{ guardCompressionRetentionGridBacktest.quotaText }} / 策略数：{{ guardCompressionRetentionGridBacktest.optionCount }}
+        </span>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardCompressionRetentionGridBacktest.conclusion }}</p>
+
+      <div v-if="guardCompressionRetentionGridBacktest.bestOption" class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">最佳保留位</div>
+          <div class="summary-value">{{ guardCompressionRetentionGridBacktest.bestOption.strategyName }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">保留结构</div>
+          <div class="summary-value">{{ guardCompressionRetentionGridBacktest.bestOption.retainText }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩9红覆盖率</div>
+          <div class="summary-value text-yellow-400">{{ formatPercent(guardCompressionRetentionGridBacktest.bestOption.compressedPoolCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">压缩10注覆盖率</div>
+          <div class="summary-value">{{ formatPercent(guardCompressionRetentionGridBacktest.bestOption.compressedTicketCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">优于原10注</div>
+          <div class="summary-value">{{ guardCompressionRetentionGridBacktest.bestOption.betterThanOriginalSingleCount }}/{{ guardCompressionRetentionGridBacktest.periodCount }}</div>
+        </div>
+      </div>
+
+      <details v-if="guardCompressionRetentionGridBestSourceContributionStats.length" class="diagnosis-collapse mt-3">
+        <summary>
+          <span>最佳保留位来源贡献</span>
+          <span>展开查看最低保留位策略下的来源贡献</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>候选命中</th>
+                <th>新增命中</th>
+                <th>救回</th>
+                <th>被挡命中</th>
+                <th>原池已含</th>
+                <th>救回号码</th>
+                <th>被挡号码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardCompressionRetentionGridBestSourceContributionStats" :key="item.sourceType">
+                <td>{{ item.sourceName }}</td>
+                <td>{{ item.candidateHitTimes }}/{{ item.candidateTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
+                <td>{{ item.addedHitTimes }}/{{ item.addedTimes }} / {{ formatPercent(item.addedHitRate) }}</td>
+                <td class="font-bold text-accent">{{ item.rescuedHitTimes }} / {{ formatPercent(item.rescuedHitRate) }}</td>
+                <td class="text-yellow-400">{{ item.blockedHitTimes }}</td>
+                <td>{{ item.alreadyInBaseHitTimes }}</td>
+                <td class="table-note">{{ formatList(item.rescuedNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.blockedHitNumbers) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>策略</th>
+              <th>保留位</th>
+              <th>评分</th>
+              <th>9红覆盖</th>
+              <th>10注覆盖</th>
+              <th>原10注</th>
+              <th>9红达4红</th>
+              <th>10注达3红</th>
+              <th>优于原10注</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in guardCompressionRetentionGridBacktest.topOptions" :key="item.strategyCode">
+              <td>{{ item.rank }}</td>
+              <td class="font-bold text-text-primary">{{ item.strategyName }}</td>
+              <td>{{ item.retainText }}</td>
+              <td>{{ formatScore(item.score) }}</td>
+              <td>{{ formatPercent(item.compressedPoolCoverageRate) }}</td>
+              <td>{{ formatPercent(item.compressedTicketCoverageRate) }}</td>
+              <td>{{ formatPercent(item.originalSingleTicketCoverageRate) }}</td>
+              <td>{{ item.compressedPoolReachFourCount }}/{{ guardCompressionRetentionGridBacktest.periodCount }}</td>
+              <td>{{ item.compressedTicketReachThreeCount }}/{{ guardCompressionRetentionGridBacktest.periodCount }}</td>
+              <td>{{ item.betterThanOriginalSingleCount }}/{{ guardCompressionRetentionGridBacktest.periodCount }}</td>
+              <td class="table-note">{{ item.strategyDescription }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary>
+          <span>最佳保留位单期明细</span>
+          <span>展开查看最低保留位策略每期压缩结果</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>实际红球</th>
+                <th>扩展命中</th>
+                <th>压缩9红池</th>
+                <th>压缩命中</th>
+                <th>压缩10注最好</th>
+                <th>原10注最好</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in guardCompressionRetentionGridBacktest.bestPeriods" :key="`${item.snapshotId}-retention-best`">
+                <td>{{ item.predictQiHao }}</td>
+                <td>
+                  <HitNumberList
+                    :numbers="item.actualRedNumbers"
+                    kind="red"
+                    :actual-red-numbers="item.compressedHitNumbers"
+                  />
+                </td>
+                <td>{{ item.expandedHitNumbers.length }}红：{{ formatList(item.expandedHitNumbers) }}</td>
+                <td class="table-note">{{ formatList(item.compressedNinePool) }}</td>
+                <td class="font-bold text-accent">{{ item.compressedHitNumbers.length }}红：{{ formatList(item.compressedHitNumbers) }}</td>
+                <td>{{ item.compressedTicketBestRedHitCount }}红</td>
+                <td>{{ item.originalSingleBestRedHitCount }}红</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in guardCompressionRetentionGridBacktest.suggestions" :key="item">- {{ item }}</p>
       </div>
     </section>
 
@@ -1211,6 +1874,10 @@ import {
   diagnoseRedCandidateMiss,
   getRedBayesColdHotDiagnosis,
   getRedCandidateGuardBacktest,
+  getRedCandidateGuardCompressionBacktest,
+  getRedCandidateGuardCompressionGridBacktest,
+  getRedCandidateGuardCompressionRetentionGridBacktest,
+  getRedCandidateGuardQuotaGridBacktest,
   getRedCandidateGuardQuotaBacktest,
   getPredictionReviewTrend,
   getRedCandidateMissDistribution,
@@ -1232,6 +1899,11 @@ import {
   type RedCandidateMissDiagnosisResult,
   type RedCandidateMissDistributionResult,
   type RedCandidateGuardBacktestResult,
+  type RedCandidateGuardCompressionBacktestResult,
+  type RedCandidateGuardCompressionGridBacktestResult,
+  type RedCandidateGuardCompressionRetentionGridBacktestResult,
+  type RedCandidateGuardQuotaGridBacktestResult,
+  type RedCandidateGuardSourceContribution,
   type RedCandidateMissWindowState,
   type RedBayesDiagnosisResult,
   type RedTopCombinationReversePredictResult,
@@ -1249,6 +1921,10 @@ const diagnosing = ref(false);
 const trendLoading = ref(false);
 const distributionLoading = ref(false);
 const guardBacktestLoading = ref(false);
+const guardQuotaGridLoading = ref(false);
+const guardCompressionLoading = ref(false);
+const guardCompressionGridLoading = ref(false);
+const guardCompressionRetentionGridLoading = ref(false);
 const bayesLoading = ref(false);
 const diagnosticSnapshotLoading = ref(false);
 const drawLoading = ref(false);
@@ -1268,11 +1944,36 @@ const reviewTrend = ref<PredictionSnapshotTrendResult | null>(null);
 const redMissDiagnosis = ref<RedCandidateMissDiagnosisResult | null>(null);
 const redMissDistribution = ref<RedCandidateMissDistributionResult | null>(null);
 const guardBacktest = ref<RedCandidateGuardBacktestResult | null>(null);
+const guardQuotaGridBacktest = ref<RedCandidateGuardQuotaGridBacktestResult | null>(null);
+const guardCompressionBacktest = ref<RedCandidateGuardCompressionBacktestResult | null>(null);
+const guardCompressionGridBacktest = ref<RedCandidateGuardCompressionGridBacktestResult | null>(null);
+const guardCompressionRetentionGridBacktest = ref<RedCandidateGuardCompressionRetentionGridBacktestResult | null>(null);
 const guardBacktestTitle = ref('红球候选池保底扩展回测');
 const bayesDiagnosis = ref<RedBayesDiagnosisResult | null>(null);
 const axisSyncResults = ref<WindowAxisChainResult[]>([]);
 const snapshots = ref<PredictionSnapshotEntity[]>([]);
 const viewMode = ref<'realtime' | 'snapshot'>('realtime');
+const emptySourceContributionStats: RedCandidateGuardSourceContribution[] = [];
+
+const guardSourceContributionStats = computed(() =>
+  guardBacktest.value?.sourceContributionStats ?? emptySourceContributionStats
+);
+
+const guardQuotaBestSourceContributionStats = computed(() =>
+  guardQuotaGridBacktest.value?.bestSourceContributionStats ?? emptySourceContributionStats
+);
+
+const guardCompressionSourceContributionStats = computed(() =>
+  guardCompressionBacktest.value?.sourceContributionStats ?? emptySourceContributionStats
+);
+
+const guardCompressionGridBestSourceContributionStats = computed(() =>
+  guardCompressionGridBacktest.value?.bestSourceContributionStats ?? emptySourceContributionStats
+);
+
+const guardCompressionRetentionGridBestSourceContributionStats = computed(() =>
+  guardCompressionRetentionGridBacktest.value?.bestSourceContributionStats ?? emptySourceContributionStats
+);
 
 /**
  * 是否已打开普通保底扩展回测结果。
@@ -2066,6 +2767,10 @@ async function loadPredictionInternal(useExistingSnapshot: boolean) {
     reviewTrend.value = null;
     redMissDistribution.value = null;
     guardBacktest.value = null;
+    guardQuotaGridBacktest.value = null;
+    guardCompressionBacktest.value = null;
+    guardCompressionGridBacktest.value = null;
+    guardCompressionRetentionGridBacktest.value = null;
     bayesDiagnosis.value = null;
     viewMode.value = 'realtime';
 
@@ -2236,6 +2941,134 @@ async function toggleGuardQuotaBacktest() {
 }
 
 /**
+ * 加载红球候选池保底来源配额网格回测
+ */
+async function loadGuardQuotaGridBacktest() {
+  guardQuotaGridLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateGuardQuotaGridBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '保底来源配额网格回测失败');
+    }
+    guardQuotaGridBacktest.value = res.data;
+    showMessage('保底来源配额网格回测完成，详细结论见下方网格区域', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '保底来源配额网格回测失败', 'error');
+  } finally {
+    guardQuotaGridLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球候选池保底来源配额网格回测区域
+ */
+async function toggleGuardQuotaGridBacktest() {
+  if (guardQuotaGridBacktest.value) {
+    guardQuotaGridBacktest.value = null;
+    showMessage('已关闭配额网格回测', 'success');
+    return;
+  }
+  await loadGuardQuotaGridBacktest();
+}
+
+/**
+ * 加载红球保底扩展池压缩回测
+ */
+async function loadGuardCompressionBacktest() {
+  guardCompressionLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateGuardCompressionBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '扩展池压缩回测失败');
+    }
+    guardCompressionBacktest.value = res.data;
+    showMessage('扩展池压缩回测完成，详细结论见下方压缩区域', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '扩展池压缩回测失败', 'error');
+  } finally {
+    guardCompressionLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球保底扩展池压缩回测区域
+ */
+async function toggleGuardCompressionBacktest() {
+  if (guardCompressionBacktest.value) {
+    guardCompressionBacktest.value = null;
+    showMessage('已关闭扩展池压缩回测', 'success');
+    return;
+  }
+  await loadGuardCompressionBacktest();
+}
+
+/**
+ * 加载红球保底扩展池压缩策略网格回测
+ */
+async function loadGuardCompressionGridBacktest() {
+  guardCompressionGridLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateGuardCompressionGridBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '压缩策略网格回测失败');
+    }
+    guardCompressionGridBacktest.value = res.data;
+    showMessage('压缩策略网格回测完成，详细结论见下方策略网格区域', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '压缩策略网格回测失败', 'error');
+  } finally {
+    guardCompressionGridLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球保底扩展池压缩策略网格回测区域
+ */
+async function toggleGuardCompressionGridBacktest() {
+  if (guardCompressionGridBacktest.value) {
+    guardCompressionGridBacktest.value = null;
+    showMessage('已关闭压缩策略网格回测', 'success');
+    return;
+  }
+  await loadGuardCompressionGridBacktest();
+}
+
+/**
+ * 加载红球保底扩展池压缩来源最低保留位网格回测
+ */
+async function loadGuardCompressionRetentionGridBacktest() {
+  guardCompressionRetentionGridLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateGuardCompressionRetentionGridBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '压缩来源最低保留位网格回测失败');
+    }
+    guardCompressionRetentionGridBacktest.value = res.data;
+    showMessage('压缩来源最低保留位网格回测完成，详细结论见下方保留位区域', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '压缩来源最低保留位网格回测失败', 'error');
+  } finally {
+    guardCompressionRetentionGridLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球保底扩展池压缩来源最低保留位网格回测区域
+ */
+async function toggleGuardCompressionRetentionGridBacktest() {
+  if (guardCompressionRetentionGridBacktest.value) {
+    guardCompressionRetentionGridBacktest.value = null;
+    showMessage('已关闭压缩来源最低保留位网格回测', 'success');
+    return;
+  }
+  await loadGuardCompressionRetentionGridBacktest();
+}
+
+/**
  * 读取最近预测快照
  */
 async function loadLatestSnapshots(showTip = true) {
@@ -2317,6 +3150,10 @@ function loadSnapshotToPage(snapshot: PredictionSnapshotEntity) {
   reviewTrend.value = null;
   redMissDistribution.value = null;
   guardBacktest.value = null;
+  guardQuotaGridBacktest.value = null;
+  guardCompressionBacktest.value = null;
+  guardCompressionGridBacktest.value = null;
+  guardCompressionRetentionGridBacktest.value = null;
   bayesDiagnosis.value = null;
   viewMode.value = 'snapshot';
   showMessage(`已切换到历史快照：ID ${snapshot.id}，预测期号 ${snapshot.predictQiHao}`, 'success');
@@ -2333,6 +3170,10 @@ async function returnRealtimePrediction() {
   reviewTrend.value = null;
   redMissDistribution.value = null;
   guardBacktest.value = null;
+  guardQuotaGridBacktest.value = null;
+  guardCompressionBacktest.value = null;
+  guardCompressionGridBacktest.value = null;
+  guardCompressionRetentionGridBacktest.value = null;
   bayesDiagnosis.value = null;
   viewMode.value = 'realtime';
   await loadPredictionInternal(false);
@@ -2479,6 +3320,10 @@ async function saveSnapshot() {
     reviewResult.value = null;
     redMissDiagnosis.value = null;
     guardBacktest.value = null;
+    guardQuotaGridBacktest.value = null;
+    guardCompressionBacktest.value = null;
+    guardCompressionGridBacktest.value = null;
+    guardCompressionRetentionGridBacktest.value = null;
     showMessage(`快照保存成功：ID ${res.data.id}，预测期号 ${res.data.predictQiHao}`, 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '保存预测快照失败', 'error');
