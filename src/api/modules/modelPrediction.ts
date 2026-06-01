@@ -38,6 +38,50 @@ export interface BlueCandidatePredictResult {
 }
 
 /**
+ * 蓝球候选池独立诊断单期明细
+ */
+export interface BlueCandidateDiagnosisPeriod {
+  snapshotId: number;                       // 快照ID
+  predictQiHao: string;                     // 预测期号
+  actualBlueNumber: string;                 // 实际开奖蓝球
+  previousBlueNumber: string | null;        // 上期蓝球
+  candidateNumbers: string[];               // 蓝球候选池
+  recommendedBlueNumber: string;            // 主推荐蓝球
+  candidateHit: boolean;                    // 候选池是否命中
+  candidateHitRank: number | null;          // 命中排名
+  top1Hit: boolean;                         // 是否命中第1名
+  top3Hit: boolean;                         // 是否命中前3名
+  recommendedBlueHit: boolean;              // 主推荐蓝球是否命中
+  sameAsPrevious: boolean;                  // 是否重蓝
+  neighborOfPrevious: boolean;              // 是否上期邻蓝
+  sameTailAsPrevious: boolean;              // 是否蓝尾重尾
+  blueTail: number | null;                  // 实际蓝尾
+  previousBlueTail: number | null;          // 上期蓝尾
+  missInterval: number | null;              // 距上次出现的间隔期数
+  conclusion: string;                       // 单期判断
+}
+
+/**
+ * 蓝球候选池独立诊断结果
+ */
+export interface BlueCandidateDiagnosisResult {
+  periodCount: number;                                      // 纳入统计期数
+  reviewedSnapshotCount: number;                            // 原始已复盘快照数
+  topLimit: number;                                         // 候选池前N名
+  candidateHitRate: number;                                 // 候选池命中率
+  top1HitRate: number;                                      // Top1命中率
+  top3HitRate: number;                                      // Top3命中率
+  recommendedBlueHitRate: number;                           // 主蓝命中率
+  sameAsPreviousCount: number;                              // 重蓝次数
+  neighborOfPreviousCount: number;                          // 邻蓝次数
+  sameTailAsPreviousCount: number;                          // 重尾次数
+  averageMissInterval: number | null;                       // 平均遗漏间隔
+  periods: BlueCandidateDiagnosisPeriod[];                  // 单期明细
+  conclusion: string;                                       // 总体结论
+  suggestions: string[];                                    // 建议
+}
+
+/**
  * 红蓝合并票面结果
  */
 export interface MultiWindowFinalTicket {
@@ -734,6 +778,166 @@ export interface RedCandidateGuardCompressionRetentionGridBacktestResult {
 }
 
 /**
+ * 红球候选池阶段漏斗中的单个阶段结果
+ */
+export interface RedCandidateFunnelStage {
+  stageCode: string;                                  // 阶段编码
+  stageName: string;                                  // 阶段名称
+  dataSource: string;                                 // 数据来源说明
+  candidateNumbers: string[];                         // 阶段候选红球
+  candidateCount: number;                             // 阶段候选数量
+  hitNumbers: string[];                               // 命中的真实红球
+  missNumbers: string[];                              // 漏掉的真实红球
+  gainedHitNumbers: string[];                         // 相比上一阶段新救回的真实红球
+  lostHitNumbers: string[];                           // 相比上一阶段重新丢失的真实红球
+  hitCount: number;                                   // 命中数量
+  hitDelta: number;                                   // 相比上一阶段的命中变化
+  coverageRate: number;                               // 覆盖率
+  explanation: string;                                // 阶段解释
+}
+
+/**
+ * 红球候选池阶段漏斗单期明细
+ */
+export interface RedCandidateFunnelPeriod {
+  snapshotId: number;                                 // 快照ID
+  predictQiHao: string;                               // 预测期号
+  actualRedNumbers: string[];                         // 实际开奖红球
+  stages: RedCandidateFunnelStage[];                  // 分阶段结果
+  conclusion: string;                                 // 单期判断
+}
+
+/**
+ * 红球候选池阶段漏斗阶段汇总
+ */
+export interface RedCandidateFunnelStageSummary {
+  stageCode: string;                                  // 阶段编码
+  stageName: string;                                  // 阶段名称
+  averageHitCount: number;                            // 平均每期命中数
+  minHitCount: number;                                // 最低单期命中数
+  maxHitCount: number;                                // 最高单期命中数
+  coverageRate: number;                               // 总覆盖率
+  reachThreeCount: number;                            // 达到3红期数
+  reachFourCount: number;                             // 达到4红期数
+  reachFiveCount: number;                             // 达到5红期数
+  reachSixCount: number;                              // 达到6红期数
+}
+
+/**
+ * 红球候选池阶段漏斗诊断结果
+ */
+export interface RedCandidateFunnelDiagnosisResult {
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  red10EntryLimit: number;                            // 红10入口池大小
+  maxExpandedSize: number;                            // 保底扩展池最大大小
+  guardQuotaText: string;                             // 保底配额说明
+  replayBoundary: string;                             // 回放边界说明
+  stageSummaries: RedCandidateFunnelStageSummary[];   // 阶段汇总
+  periods: RedCandidateFunnelPeriod[];                // 单期明细
+  conclusion: string;                                 // 总体结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 保底来源参与评分后的红球组合结果
+ */
+export interface RedCandidateFusionCombination {
+  rank: number;                                       // 组合排名
+  numbers: string[];                                  // 组合红球
+  numberText: string;                                 // 号码文本
+  hitNumbers: string[];                               // 命中的真实红球
+  hitCount: number;                                   // 命中数量
+  numberScore: number;                                // 红10单号平均分
+  structureScore: number;                             // 三窗口结构分
+  sourceScore: number;                                // 保底来源分
+  finalScore: number;                                 // 最终融合分
+  explanation: string;                                // 评分说明
+}
+
+/**
+ * 红球入口池/组合评分融合回测单期结果
+ */
+export interface RedCandidateFusionBacktestPeriod {
+  snapshotId: number;                                 // 快照ID
+  predictQiHao: string;                               // 预测期号
+  actualRedNumbers: string[];                         // 实际开奖红球
+  baseEntryPool: string[];                            // 原红10入口池
+  fusedEntryPool: string[];                           // 融合后的入口池
+  addedNumbers: string[];                             // 融合入口新增号码
+  baseEntryHitNumbers: string[];                      // 原入口池命中
+  fusedEntryHitNumbers: string[];                     // 融合入口池命中
+  originalCombinationHitNumbers: string[];            // 原红球组合池命中
+  fusedCombinationHitNumbers: string[];               // 融合组合池命中
+  fusedCombinationPool: string[];                     // 融合组合Top池
+  fusedCombinations: RedCandidateFusionCombination[]; // 融合组合Top列表
+  conclusion: string;                                 // 单期结论
+}
+
+/**
+ * 红球入口池融合与组合评分融合回测结果
+ */
+export interface RedCandidateFusionBacktestResult {
+  backtestType: string;                               // 回测类型
+  backtestName: string;                               // 回测名称
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  red10TopLimit: number;                              // 红10基础入口数量
+  maxFusedEntrySize: number;                          // 融合入口最大数量
+  sourceQuotaText: string;                            // 保底来源配额说明
+  baseEntryCoverageRate: number;                      // 原入口池覆盖率
+  fusedEntryCoverageRate: number;                     // 融合入口池覆盖率
+  originalCombinationCoverageRate: number;            // 原组合池覆盖率
+  fusedCombinationCoverageRate: number;               // 融合组合池覆盖率
+  fusedEntryReachFourCount: number;                   // 融合入口达到4红期数
+  fusedCombinationReachFourCount: number;             // 融合组合达到4红期数
+  averageAddedCount: number;                          // 平均新增号码数量
+  periods: RedCandidateFusionBacktestPeriod[];        // 单期明细
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
+ * 红球入口融合/组合来源权重网格单项
+ */
+export interface RedCandidateFusionGridOption {
+  rank: number;                                       // 网格排名
+  optionCode: string;                                 // 方案编码
+  optionName: string;                                 // 方案名称
+  parameterText: string;                              // 参数说明
+  red10TopLimit: number;                              // 红10入口TopN
+  repeatQuota: number;                                // 重号来源名额
+  neighborQuota: number;                              // 邻号来源名额
+  bayesQuota: number;                                 // 贝叶斯来源名额
+  sourceWeight: number;                               // 组合评分来源权重
+  baseEntryCoverageRate: number;                      // 原入口覆盖率
+  fusedEntryCoverageRate: number;                     // 融合入口覆盖率
+  originalCombinationCoverageRate: number;            // 原组合覆盖率
+  fusedCombinationCoverageRate: number;               // 融合组合覆盖率
+  coverageLift: number;                               // 覆盖提升
+  reachFourCount: number;                             // 达到4红期数
+  averageAddedCount: number;                          // 平均新增号码数
+  score: number;                                      // 观察评分
+}
+
+/**
+ * 红球入口融合/组合来源权重网格回测结果
+ */
+export interface RedCandidateFusionGridBacktestResult {
+  backtestType: string;                               // 回测类型
+  backtestName: string;                               // 回测名称
+  periodCount: number;                                // 纳入统计期数
+  reviewedSnapshotCount: number;                      // 原始已复盘快照数量
+  optionCount: number;                                // 网格方案数量
+  topLimit: number;                                   // 返回方案数量
+  bestOption: RedCandidateFusionGridOption | null;    // 当前最优方案
+  topOptions: RedCandidateFusionGridOption[];         // 排名前列方案
+  bestPeriods: RedCandidateFusionBacktestPeriod[];    // 最优方案单期明细
+  conclusion: string;                                 // 回测结论
+  suggestions: string[];                              // 下一步建议
+}
+
+/**
  * 通用窗口坐标结构链同步结果
  */
 export interface WindowAxisChainResult {
@@ -879,7 +1083,9 @@ export async function savePredictionDiagnosticReviewPack(
       snapshotId,
       recentLimit,
       replaceSameType: true
-    }
+    },
+    // 诊断包会串行保存多期趋势、阶段漏斗、入口网格、压缩网格等重型回测，耗时明显长于普通接口。
+    timeout: 180000
   });
 }
 
@@ -906,6 +1112,109 @@ export async function getRedCandidateMissDistribution(
 ): Promise<ApiResponse<RedCandidateMissDistributionResult>> {
   return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/distribution', {
     params: { recentLimit }
+  });
+}
+
+/**
+ * 诊断红球候选池阶段漏斗
+ * @param recentLimit 最近复盘期数
+ * @returns 阶段漏斗诊断结果
+ */
+export async function getRedCandidateFunnelDiagnosis(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFunnelDiagnosisResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/funnel-diagnosis', {
+    params: {
+      recentLimit,
+      red10EntryLimit: 15
+    }
+  });
+}
+
+/**
+ * 获取蓝球候选池独立诊断结果
+ * @param recentLimit 最近复盘期数
+ * @returns 蓝球候选池覆盖、排序、重蓝邻蓝和蓝尾诊断
+ */
+export async function getBlueCandidateDiagnosis(
+  recentLimit = 20
+): Promise<ApiResponse<BlueCandidateDiagnosisResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/blue-candidate/overview', {
+    params: {
+      recentLimit,
+      topLimit: 5
+    }
+  });
+}
+
+/**
+ * 回测红球入口池融合效果
+ * @param recentLimit 最近预测期数量
+ * @returns 入口池融合回测结果
+ */
+export async function getRedCandidateEntryFusionBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFusionBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/entry-fusion-backtest', {
+    params: { recentLimit }
+  });
+}
+
+/**
+ * 回测红球入口池重评分融合效果
+ * @param recentLimit 最近预测期数量
+ * @returns 入口池重评分融合回测结果
+ */
+export async function getRedCandidateEntryRescoreFusionBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFusionBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/entry-rescore-fusion-backtest', {
+    params: { recentLimit }
+  });
+}
+
+/**
+ * 回测红10TopN与来源配额入口融合网格
+ * @param recentLimit 最近预测期数量
+ * @returns 入口融合网格回测结果
+ */
+export async function getRedCandidateEntryFusionGridBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFusionGridBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/entry-fusion-grid-backtest', {
+    params: {
+      recentLimit,
+      topLimit: 10
+    }
+  });
+}
+
+/**
+ * 回测红球组合评分融合效果
+ * @param recentLimit 最近预测期数量
+ * @returns 组合评分融合回测结果
+ */
+export async function getRedCandidateCombinationFusionBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFusionBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/combination-fusion-backtest', {
+    params: { recentLimit }
+  });
+}
+
+/**
+ * 回测红球组合评分来源权重网格
+ * @param recentLimit 最近预测期数量
+ * @returns 组合评分来源权重网格回测结果
+ */
+export async function getRedCandidateCombinationSourceWeightGridBacktest(
+  recentLimit = 20
+): Promise<ApiResponse<RedCandidateFusionGridBacktestResult>> {
+  return request.get('/ssq/window/axis/score/diagnosis/red-candidate-miss/combination-source-weight-grid-backtest', {
+    params: {
+      recentLimit,
+      topLimit: 10
+    }
   });
 }
 

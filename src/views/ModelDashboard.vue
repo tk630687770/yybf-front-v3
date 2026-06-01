@@ -88,18 +88,53 @@
               {{ distributionLoading ? '统计中...' : redMissDistribution ? '关闭多期漏号统计' : '多期漏号统计' }}
             </button>
             <button
-              :disabled="guardBacktestLoading"
-              :class="['action-button', { 'action-button-active': isGuardBacktestOpen }]"
-              @click="toggleGuardBacktest"
+              :disabled="funnelDiagnosisLoading"
+              :class="['action-button', { 'action-button-active': redFunnelDiagnosis }]"
+              @click="toggleFunnelDiagnosis"
             >
-              {{ guardBacktestLoading ? '回测中...' : isGuardBacktestOpen ? '关闭保底扩展回测' : '保底扩展回测' }}
+              {{ funnelDiagnosisLoading ? '诊断中...' : redFunnelDiagnosis ? '关闭阶段漏斗' : '阶段漏斗诊断' }}
+            </button>
+            <button
+              :disabled="entryFusionLoading"
+              :class="['action-button', { 'action-button-active': entryFusionBacktest }]"
+              @click="toggleEntryFusionBacktest"
+            >
+              {{ entryFusionLoading ? '回测中...' : entryFusionBacktest ? '关闭入口融合' : '入口融合回测' }}
+            </button>
+            <button
+              :disabled="entryRescoreFusionLoading"
+              :class="['action-button', { 'action-button-active': entryRescoreFusionBacktest }]"
+              @click="toggleEntryRescoreFusionBacktest"
+            >
+              {{ entryRescoreFusionLoading ? '回测中...' : entryRescoreFusionBacktest ? '关闭入口重评分' : '入口重评分' }}
+            </button>
+            <button
+              :disabled="entryFusionGridLoading"
+              :class="['action-button', { 'action-button-active': entryFusionGridBacktest }]"
+              @click="toggleEntryFusionGridBacktest"
+            >
+              {{ entryFusionGridLoading ? '回测中...' : entryFusionGridBacktest ? '关闭入口融合网格' : '入口融合网格' }}
+            </button>
+            <button
+              :disabled="combinationFusionLoading"
+              :class="['action-button', { 'action-button-active': combinationFusionBacktest }]"
+              @click="toggleCombinationFusionBacktest"
+            >
+              {{ combinationFusionLoading ? '回测中...' : combinationFusionBacktest ? '关闭组合融合' : '组合融合回测' }}
+            </button>
+            <button
+              :disabled="combinationSourceWeightGridLoading"
+              :class="['action-button', { 'action-button-active': combinationSourceWeightGridBacktest }]"
+              @click="toggleCombinationSourceWeightGridBacktest"
+            >
+              {{ combinationSourceWeightGridLoading ? '回测中...' : combinationSourceWeightGridBacktest ? '关闭来源权重网格' : '来源权重网格' }}
             </button>
             <button
               :disabled="guardBacktestLoading"
-              :class="['action-button', { 'action-button-active': isGuardQuotaBacktestOpen }]"
-              @click="toggleGuardQuotaBacktest"
+              :class="['action-button', { 'action-button-active': isGuardBacktestOpen }]"
+              @click="toggleGuardBacktestComparison"
             >
-              {{ guardBacktestLoading ? '回测中...' : isGuardQuotaBacktestOpen ? '关闭配额保底回测' : '配额保底回测' }}
+              {{ guardBacktestLoading ? '回测中...' : isGuardBacktestOpen ? '关闭保底扩展对照' : '保底扩展对照' }}
             </button>
             <button
               :disabled="guardQuotaGridLoading"
@@ -135,6 +170,13 @@
               @click="toggleBayesDiagnosis"
             >
               {{ bayesLoading ? '诊断中...' : bayesDiagnosis ? '关闭贝叶斯冷热' : '贝叶斯冷热' }}
+            </button>
+            <button
+              :disabled="blueDiagnosisLoading"
+              :class="['action-button', { 'action-button-active': blueCandidateDiagnosis }]"
+              @click="toggleBlueCandidateDiagnosis"
+            >
+              {{ blueDiagnosisLoading ? '诊断中...' : blueCandidateDiagnosis ? '关闭蓝球诊断' : '蓝球独立诊断' }}
             </button>
           </div>
         </div>
@@ -242,6 +284,115 @@
           </div>
         </div>
       </div>
+
+      <div class="mt-3 workflow-panel">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="font-bold text-text-primary">开奖后执行链</div>
+            <p class="mt-1 text-xs text-text-secondary">
+              用于检查复盘证据链是否闭合；这里只提示状态，不会自动改写预测或诊断数据。
+            </p>
+          </div>
+          <span class="text-xs text-text-secondary">{{ workflowSummaryText }}</span>
+        </div>
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2">
+          <div
+            v-for="step in postDrawWorkflowSteps"
+            :key="step.key"
+            :class="['workflow-step', `workflow-step-${step.status}`]"
+          >
+            <div class="workflow-step-title">{{ step.title }}</div>
+            <div class="workflow-step-status">{{ step.statusText }}</div>
+            <div class="workflow-step-desc">{{ step.description }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="isDiagnosticPage" class="bg-bg-card rounded-lg p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">诊断阅读顺序</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            先看结果是否变好，再看号码在哪一层丢失，最后看观察策略是否值得继续跟踪。
+          </p>
+        </div>
+        <span class="text-xs text-text-secondary">观察链路不直接改变正式出票</span>
+      </div>
+      <div class="mt-3 diagnostic-guide-grid">
+        <div
+          v-for="item in diagnosticGuideItems"
+          :key="item.title"
+          class="diagnostic-guide-item"
+        >
+          <div class="diagnostic-guide-order">{{ item.order }}</div>
+          <div>
+            <div class="diagnostic-guide-title">{{ item.title }}</div>
+            <div class="diagnostic-guide-desc">{{ item.description }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="isDiagnosticPage" class="bg-bg-card rounded-lg p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">诊断指标速读</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            这些解释用于阅读下方所有诊断结果；当前仍是观察线，不代表已经进入正式预测。
+          </p>
+        </div>
+        <span class="text-xs text-text-secondary">先看覆盖，再看压缩，再看稳定性</span>
+      </div>
+
+      <div class="mt-3 metric-guide-grid">
+        <div
+          v-for="item in diagnosticMetricGuideItems"
+          :key="item.title"
+          class="metric-guide-item"
+        >
+          <div class="metric-guide-title">{{ item.title }}</div>
+          <div class="metric-guide-formula">{{ item.formula }}</div>
+          <div class="metric-guide-desc">{{ item.description }}</div>
+          <div class="metric-guide-watch">{{ item.watchPoint }}</div>
+        </div>
+      </div>
+
+      <div class="mt-3 info-box">
+        当前判断顺序：如果入口池本身覆盖不足，优先改入口；如果入口有覆盖但组合池掉了，优先改组合评分；
+        如果扩展池能救回但压缩后又丢失，优先改压缩策略；如果红球改善但蓝球漏掉，蓝球必须单独诊断。
+      </div>
+    </section>
+
+    <section v-if="isDiagnosticPage" class="bg-bg-card rounded-lg p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">策略准入规则</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            观察策略进入正式预测前，必须先满足多期稳定性；这里给出当前是否可以升级的明确提示。
+          </p>
+        </div>
+        <span :class="['strategy-admission-badge', strategyAdmissionStateClass]">
+          {{ strategyAdmissionStateText }}
+        </span>
+      </div>
+
+      <div class="mt-3 strategy-admission-grid">
+        <div
+          v-for="item in strategyAdmissionChecks"
+          :key="item.title"
+          :class="['strategy-admission-item', `strategy-admission-${item.status}`]"
+        >
+          <div class="strategy-admission-title">{{ item.title }}</div>
+          <div class="strategy-admission-status">{{ item.statusText }}</div>
+          <div class="strategy-admission-desc">{{ item.description }}</div>
+        </div>
+      </div>
+
+      <div class="mt-3 info-box">
+        准入纪律：任何观察策略要进入正式预测，至少需要6-7期样本；覆盖率必须提升，压缩后不能明显回落；
+        蓝球不能继续拖后腿；并且必须先写入策略决策记录，再升级模型版本。
+      </div>
     </section>
 
     <!-- 最近预测快照列表 -->
@@ -269,7 +420,14 @@
               <td>{{ item.id }}</td>
               <td>{{ item.predictQiHao }}</td>
               <td>{{ item.createTime }}</td>
-              <td class="font-bold text-text-primary">{{ item.finalRecommendedTicketText || '--' }}</td>
+              <td class="font-bold text-text-primary">
+                <TicketTextByText
+                  v-if="item.finalRecommendedTicketText"
+                  :ticket-text="item.finalRecommendedTicketText"
+                  :actual-ticket-text="snapshotActualTicketText(item)"
+                />
+                <span v-else>--</span>
+              </td>
               <td>{{ item.modelVersion }}</td>
               <td>
                 <span :class="snapshotReviewBadgeClass(item)">
@@ -300,8 +458,8 @@
     </section>
 
     <!-- 红球贝叶斯冷热诊断：单号动态修正观察，不直接改变正式预测 -->
-    <section v-if="isDiagnosticPage && bayesDiagnosis" class="bg-bg-card rounded-lg p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && bayesDiagnosis" :class="diagnosticSectionClass('bayes')">
+      <div class="diagnostic-section-header flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-bold text-text-primary">红球贝叶斯冷热诊断</h2>
           <p class="mt-1 text-xs text-text-secondary">
@@ -311,6 +469,9 @@
         <span class="text-xs text-text-secondary">
           预测期号：{{ bayesDiagnosis.predictQiHao }} / 窗口：{{ bayesDiagnosis.windowSizes.join(',') }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('bayes')">
+          {{ diagnosticSectionCollapseText('bayes') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -395,8 +556,8 @@
     </section>
 
     <!-- 多期复盘趋势：用已复盘快照判断模型是否沿着正确方向进步 -->
-    <section v-if="isDiagnosticPage && reviewTrend" class="bg-bg-card rounded-lg p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && reviewTrend" :class="diagnosticSectionClass('reviewTrend')">
+      <div class="diagnostic-section-header flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-bold text-text-primary">多期复盘趋势</h2>
           <p class="mt-1 text-xs text-text-secondary">
@@ -406,6 +567,9 @@
         <span class="text-xs text-text-secondary">
           统计期数：{{ reviewTrend.periodCount }} / 原始已复盘快照：{{ reviewTrend.reviewedSnapshotCount }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('reviewTrend')">
+          {{ diagnosticSectionCollapseText('reviewTrend') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -497,8 +661,18 @@
           <tbody>
             <tr v-for="item in reviewTrend.periods" :key="item.snapshotId">
               <td>{{ item.predictQiHao }}</td>
-              <td class="font-bold text-text-primary">{{ item.actualTicketText }}</td>
-              <td class="font-bold text-text-primary">{{ item.recommendedTicketText }}</td>
+              <td class="font-bold text-text-primary">
+                <TicketTextByText
+                  :ticket-text="item.actualTicketText"
+                  :actual-ticket-text="item.actualTicketText"
+                />
+              </td>
+              <td class="font-bold text-text-primary">
+                <TicketTextByText
+                  :ticket-text="item.recommendedTicketText"
+                  :actual-ticket-text="item.actualTicketText"
+                />
+              </td>
               <td>
                 {{ item.recommendedRedHitCount }}红 /
                 <span :class="item.recommendedBlueHit ? 'text-ball-blue' : 'text-text-secondary'">
@@ -526,11 +700,122 @@
       </div>
     </section>
 
+    <!-- 蓝球候选池独立诊断 -->
+    <section v-if="isDiagnosticPage && blueCandidateDiagnosis" :class="diagnosticSectionClass('blueCandidate')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">蓝球候选池独立诊断</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            统计期数：{{ blueCandidateDiagnosis.periodCount }} / 候选口径：Top{{ blueCandidateDiagnosis.topLimit }} / 原始已复盘快照：{{ blueCandidateDiagnosis.reviewedSnapshotCount }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('blueCandidate')">
+          {{ diagnosticSectionCollapseText('blueCandidate') }}
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">候选池命中率</div>
+          <div class="summary-value text-ball-blue">{{ formatPercent(blueCandidateDiagnosis.candidateHitRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">Top1 / Top3</div>
+          <div class="summary-value">
+            {{ formatPercent(blueCandidateDiagnosis.top1HitRate) }}
+            <span class="text-text-secondary">/ {{ formatPercent(blueCandidateDiagnosis.top3HitRate) }}</span>
+          </div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">主蓝命中率</div>
+          <div class="summary-value">{{ formatPercent(blueCandidateDiagnosis.recommendedBlueHitRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">重蓝 / 邻蓝 / 重尾</div>
+          <div class="summary-value">
+            {{ blueCandidateDiagnosis.sameAsPreviousCount }}
+            <span class="text-text-secondary">/ {{ blueCandidateDiagnosis.neighborOfPreviousCount }} / {{ blueCandidateDiagnosis.sameTailAsPreviousCount }}</span>
+          </div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">平均遗漏间隔</div>
+          <div class="summary-value">{{ blueCandidateDiagnosis.averageMissInterval ?? '--' }} 期</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ blueCandidateDiagnosis.conclusion }}</p>
+
+      <div class="mt-3 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>实际蓝</th>
+              <th>上期蓝</th>
+              <th>候选池</th>
+              <th>命中排名</th>
+              <th>Top状态</th>
+              <th>重邻尾</th>
+              <th>遗漏</th>
+              <th>判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in blueCandidateDiagnosis.periods" :key="item.snapshotId">
+              <td>{{ item.predictQiHao }}</td>
+              <td>
+                <HitNumberList
+                  :numbers="[item.actualBlueNumber]"
+                  kind="blue"
+                  :actual-blue-number="item.actualBlueNumber"
+                />
+              </td>
+              <td>{{ item.previousBlueNumber || '--' }}</td>
+              <td>
+                <HitNumberList
+                  :numbers="item.candidateNumbers"
+                  kind="blue"
+                  :actual-blue-number="item.actualBlueNumber"
+                />
+              </td>
+              <td>
+                <span :class="item.candidateHit ? 'text-ball-blue' : 'text-red-400'">
+                  {{ item.candidateHit ? `第${item.candidateHitRank}名` : '未覆盖' }}
+                </span>
+              </td>
+              <td>
+                <span :class="item.top1Hit ? 'text-ball-blue' : 'text-text-secondary'">Top1</span>
+                /
+                <span :class="item.top3Hit ? 'text-ball-blue' : 'text-text-secondary'">Top3</span>
+              </td>
+              <td>
+                重{{ item.sameAsPrevious ? '是' : '否' }}
+                / 邻{{ item.neighborOfPrevious ? '是' : '否' }}
+                / 尾{{ item.sameTailAsPrevious ? '是' : '否' }}
+              </td>
+              <td>{{ item.missInterval ?? '--' }}期</td>
+              <td>{{ item.conclusion }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 summary-block">
+        <div class="summary-label">阶段建议</div>
+        <div class="summary-value text-sm leading-6">
+          <p v-for="item in blueCandidateDiagnosis.suggestions" :key="item">- {{ item }}</p>
+        </div>
+      </div>
+    </section>
+
     <!-- 红球漏号分布统计 -->
-    <section v-if="isDiagnosticPage && redMissDistribution" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && redMissDistribution" :class="diagnosticSectionClass('missDistribution')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球漏号分布统计</h2>
         <span class="text-xs text-text-secondary">已复盘快照：{{ redMissDistribution.snapshotCount }}</span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('missDistribution')">
+          {{ diagnosticSectionCollapseText('missDistribution') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -593,47 +878,678 @@
       </div>
     </section>
 
-    <!-- 红球候选池保底扩展回测 -->
-    <section v-if="isDiagnosticPage && guardBacktest" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-bold text-text-primary">{{ guardBacktestTitle }}</h2>
-        <span class="text-xs text-text-secondary">
-          统计期数：{{ guardBacktest.periodCount }} / 扩展池上限：{{ guardBacktest.maxExpandedSize }}
-        </span>
+    <!-- 红球候选池阶段漏斗诊断 -->
+    <section v-if="isDiagnosticPage && redFunnelDiagnosis" :class="diagnosticSectionClass('redFunnel')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球候选池阶段漏斗诊断</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            统计期数：{{ redFunnelDiagnosis.periodCount }} / 红10入口Top{{ redFunnelDiagnosis.red10EntryLimit }} / 保底配额：{{ redFunnelDiagnosis.guardQuotaText }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('redFunnel')">
+          {{ diagnosticSectionCollapseText('redFunnel') }}
+        </button>
+      </div>
+
+      <div class="mt-3 info-box">
+        {{ redFunnelDiagnosis.replayBoundary }}
+        <div class="mt-2">
+          第二批增强口径：每一层都会和上一层比较，“救回”表示上一层没命中但本层命中的真实红球；
+          “丢失”表示上一层命中过但本层没有继续保住的真实红球。
+        </div>
+      </div>
+
+      <div class="mt-4 funnel-flow-grid">
+        <div
+          v-for="item in redFunnelDiagnosis.stageSummaries"
+          :key="item.stageCode"
+          class="funnel-flow-card"
+        >
+          <div class="funnel-flow-title">{{ item.stageName }}</div>
+          <div class="funnel-flow-value">
+            平均{{ formatScore(item.averageHitCount) }}红 / 覆盖{{ formatPercent(item.coverageRate) }}
+          </div>
+          <div class="funnel-flow-meta">
+            最低{{ item.minHitCount }}红，最高{{ item.maxHitCount }}红；达到4红 {{ item.reachFourCount }}期。
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="summary-block">
+          <div class="summary-label">总体结论</div>
+          <div class="summary-value text-sm">{{ redFunnelDiagnosis.conclusion }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">下一步建议</div>
+          <div class="mt-2 space-y-1 text-xs text-text-secondary">
+            <p v-for="item in redFunnelDiagnosis.suggestions" :key="item">- {{ item }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>阶段</th>
+              <th>候选池</th>
+              <th>命中</th>
+              <th>变化</th>
+              <th>本层救回</th>
+              <th>本层丢失</th>
+              <th>漏号</th>
+              <th>覆盖率</th>
+              <th>解释</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="period in redFunnelDiagnosis.periods" :key="period.predictQiHao">
+              <tr v-for="stage in period.stages" :key="`${period.predictQiHao}-${stage.stageCode}`">
+                <td>{{ period.predictQiHao }}</td>
+                <td>
+                  <div class="font-bold text-text-primary">{{ stage.stageName }}</div>
+                  <div class="mt-1 text-xs text-text-secondary">{{ stage.dataSource }}</div>
+                </td>
+                <td>
+                  <HitNumberList
+                    :numbers="stage.candidateNumbers"
+                    kind="red"
+                    :actual-red-numbers="period.actualRedNumbers"
+                  />
+                </td>
+                <td class="text-ball-red font-bold">{{ stage.hitCount }}红 {{ stage.hitNumbers.join(',') || '--' }}</td>
+                <td :class="funnelDeltaClass(stage.hitDelta)">
+                  {{ funnelDeltaText(stage.hitDelta) }}
+                </td>
+                <td>
+                  <HitNumberList
+                    :numbers="stage.gainedHitNumbers || []"
+                    kind="red"
+                    :actual-red-numbers="period.actualRedNumbers"
+                  />
+                </td>
+                <td>
+                  <HitNumberList
+                    :numbers="stage.lostHitNumbers || []"
+                    kind="red"
+                    :actual-red-numbers="period.actualRedNumbers"
+                  />
+                </td>
+                <td>{{ stage.missNumbers.join(',') || '--' }}</td>
+                <td>{{ formatPercent(stage.coverageRate) }}</td>
+                <td class="table-note">{{ stage.explanation }}</td>
+              </tr>
+              <tr class="diagnostic-subtotal-row">
+                <td colspan="10">第{{ period.predictQiHao }}期判断：{{ period.conclusion }}</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 红球入口池融合回测 -->
+    <section v-if="isDiagnosticPage && entryFusionBacktest" :class="diagnosticSectionClass('entryFusion')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球入口池融合回测</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            {{ entryFusionBacktest.sourceQuotaText }} / 融合入口上限：{{ entryFusionBacktest.maxFusedEntrySize }} / 统计期数：{{ entryFusionBacktest.periodCount }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('entryFusion')">
+          {{ diagnosticSectionCollapseText('entryFusion') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div class="summary-block">
+          <div class="summary-label">原红10入口覆盖率</div>
+          <div class="summary-value">{{ formatPercent(entryFusionBacktest.baseEntryCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">融合入口覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(entryFusionBacktest.fusedEntryCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">达到4红期数</div>
+          <div class="summary-value">{{ entryFusionBacktest.fusedEntryReachFourCount }}/{{ entryFusionBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">平均新增红球</div>
+          <div class="summary-value">{{ formatScore(entryFusionBacktest.averageAddedCount) }}个</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ entryFusionBacktest.conclusion }}</p>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>实际开奖</th>
+              <th>原入口命中</th>
+              <th>融合入口命中</th>
+              <th>新增号码</th>
+              <th>单期判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="period in entryFusionBacktest.periods" :key="period.snapshotId">
+              <td>{{ period.predictQiHao }}</td>
+              <td>
+                <HitNumberList :numbers="period.actualRedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+              </td>
+              <td>
+                <HitNumberList :numbers="period.baseEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                <div class="mt-1 text-xs text-text-secondary">{{ period.baseEntryHitNumbers.length }}红</div>
+              </td>
+              <td>
+                <HitNumberList :numbers="period.fusedEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                <div class="mt-1 text-xs text-accent">{{ period.fusedEntryHitNumbers.length }}红</div>
+              </td>
+              <td>
+                <HitNumberList :numbers="period.addedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+              </td>
+              <td class="table-note">{{ period.conclusion }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in entryFusionBacktest.suggestions" :key="item">- {{ item }}</p>
+      </div>
+    </section>
+
+    <!-- 红球入口池重评分融合回测 -->
+    <section v-if="isDiagnosticPage && entryRescoreFusionBacktest" :class="diagnosticSectionClass('entryRescoreFusion')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球入口池重评分融合回测</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            {{ entryRescoreFusionBacktest.sourceQuotaText }} / 统计期数：{{ entryRescoreFusionBacktest.periodCount }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('entryRescoreFusion')">
+          {{ diagnosticSectionCollapseText('entryRescoreFusion') }}
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">原红10入口覆盖率</div>
+          <div class="summary-value">{{ formatPercent(entryRescoreFusionBacktest.baseEntryCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">重评分入口覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(entryRescoreFusionBacktest.fusedEntryCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">达到4红期数</div>
+          <div class="summary-value">{{ entryRescoreFusionBacktest.fusedEntryReachFourCount }}/{{ entryRescoreFusionBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">平均换入红球</div>
+          <div class="summary-value">{{ formatScore(entryRescoreFusionBacktest.averageAddedCount) }}个</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ entryRescoreFusionBacktest.conclusion }}</p>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>实际开奖</th>
+              <th>原入口</th>
+              <th>重评分入口</th>
+              <th>换入号码</th>
+              <th>单期判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="period in entryRescoreFusionBacktest.periods" :key="period.snapshotId">
+              <td>{{ period.predictQiHao }}</td>
+              <td><HitNumberList :numbers="period.actualRedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" /></td>
+              <td>
+                <HitNumberList :numbers="period.baseEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                <div class="mt-1 text-xs text-text-secondary">{{ period.baseEntryHitNumbers.length }}红</div>
+              </td>
+              <td>
+                <HitNumberList :numbers="period.fusedEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                <div class="mt-1 text-xs text-accent">{{ period.fusedEntryHitNumbers.length }}红</div>
+              </td>
+              <td><HitNumberList :numbers="period.addedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" /></td>
+              <td class="table-note">{{ period.conclusion }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 红球入口池TopN与来源配额网格回测 -->
+    <section v-if="isDiagnosticPage && entryFusionGridBacktest" :class="diagnosticSectionClass('entryFusionGrid')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球入口池TopN与来源配额网格</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            共比较 {{ entryFusionGridBacktest.optionCount }} 组参数；当前最优：{{ entryFusionGridBacktest.bestOption?.parameterText || '--' }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('entryFusionGrid')">
+          {{ diagnosticSectionCollapseText('entryFusionGrid') }}
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">最优融合覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(entryFusionGridBacktest.bestOption?.fusedEntryCoverageRate || 0) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">覆盖提升</div>
+          <div class="summary-value">{{ formatPercent(entryFusionGridBacktest.bestOption?.coverageLift || 0) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">达到4红期数</div>
+          <div class="summary-value">{{ entryFusionGridBacktest.bestOption?.reachFourCount || 0 }}/{{ entryFusionGridBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">平均新增红球</div>
+          <div class="summary-value">{{ formatScore(entryFusionGridBacktest.bestOption?.averageAddedCount || 0) }}个</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ entryFusionGridBacktest.conclusion }}</p>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>参数</th>
+              <th>原入口覆盖</th>
+              <th>融合覆盖</th>
+              <th>提升</th>
+              <th>4红期数</th>
+              <th>平均新增</th>
+              <th>观察分</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="option in entryFusionGridBacktest.topOptions" :key="option.optionCode">
+              <td>{{ option.rank }}</td>
+              <td class="font-bold text-text-primary">{{ option.parameterText }}</td>
+              <td>{{ formatPercent(option.baseEntryCoverageRate) }}</td>
+              <td class="text-accent font-bold">{{ formatPercent(option.fusedEntryCoverageRate) }}</td>
+              <td>{{ formatPercent(option.coverageLift) }}</td>
+              <td>{{ option.reachFourCount }}/{{ entryFusionGridBacktest.periodCount }}</td>
+              <td>{{ formatScore(option.averageAddedCount) }}</td>
+              <td>{{ formatScore(option.score) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary class="diagnosis-summary">
+          <span>展开最优参数单期明细</span>
+          <span class="diagnosis-toggle-text">展开</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>实际开奖</th>
+                <th>基准入口</th>
+                <th>融合入口</th>
+                <th>新增号码</th>
+                <th>单期判断</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="period in entryFusionGridBacktest.bestPeriods" :key="`${period.snapshotId}-entry-grid`">
+                <td>{{ period.predictQiHao }}</td>
+                <td><HitNumberList :numbers="period.actualRedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" /></td>
+                <td>
+                  <HitNumberList :numbers="period.baseEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                  <div class="mt-1 text-xs text-text-secondary">{{ period.baseEntryHitNumbers.length }}红</div>
+                </td>
+                <td>
+                  <HitNumberList :numbers="period.fusedEntryPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                  <div class="mt-1 text-xs text-accent">{{ period.fusedEntryHitNumbers.length }}红</div>
+                </td>
+                <td><HitNumberList :numbers="period.addedNumbers" kind="red" :actual-red-numbers="period.actualRedNumbers" /></td>
+                <td class="table-note">{{ period.conclusion }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- 红球组合评分融合回测 -->
+    <section v-if="isDiagnosticPage && combinationFusionBacktest" :class="diagnosticSectionClass('combinationFusion')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球组合评分融合回测</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            让保底来源分参与组合排序；{{ combinationFusionBacktest.sourceQuotaText }} / 统计期数：{{ combinationFusionBacktest.periodCount }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('combinationFusion')">
+          {{ diagnosticSectionCollapseText('combinationFusion') }}
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">原组合池覆盖率</div>
+          <div class="summary-value">{{ formatPercent(combinationFusionBacktest.originalCombinationCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">融合组合池覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(combinationFusionBacktest.fusedCombinationCoverageRate) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">融合组合达到4红</div>
+          <div class="summary-value">{{ combinationFusionBacktest.fusedCombinationReachFourCount }}/{{ combinationFusionBacktest.periodCount }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">入口融合覆盖率</div>
+          <div class="summary-value">{{ formatPercent(combinationFusionBacktest.fusedEntryCoverageRate) }}</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ combinationFusionBacktest.conclusion }}</p>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>期号</th>
+              <th>融合组合池</th>
+              <th>原组合命中</th>
+              <th>融合组合命中</th>
+              <th>Top融合组合</th>
+              <th>单期判断</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="period in combinationFusionBacktest.periods" :key="period.snapshotId">
+              <td>{{ period.predictQiHao }}</td>
+              <td>
+                <HitNumberList :numbers="period.fusedCombinationPool" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+              </td>
+              <td class="text-text-secondary">{{ period.originalCombinationHitNumbers.length }}红 {{ period.originalCombinationHitNumbers.join(',') || '--' }}</td>
+              <td class="text-accent font-bold">{{ period.fusedCombinationHitNumbers.length }}红 {{ period.fusedCombinationHitNumbers.join(',') || '--' }}</td>
+              <td class="table-note">
+                <div v-for="item in period.fusedCombinations.slice(0, 3)" :key="`${period.snapshotId}-${item.rank}`">
+                  第{{ item.rank }}名
+                  <HitNumberList :numbers="item.numbers" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                  <span> / 分{{ formatScore(item.finalScore) }} / 命中{{ item.hitCount }}红</span>
+                </div>
+              </td>
+              <td class="table-note">{{ period.conclusion }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary class="diagnosis-summary">
+          <span>展开融合组合评分明细</span>
+          <span class="diagnosis-toggle-text">展开</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>排名</th>
+                <th>组合</th>
+                <th>命中</th>
+                <th>红10均分</th>
+                <th>结构分</th>
+                <th>来源分</th>
+                <th>最终分</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="period in combinationFusionBacktest.periods" :key="`${period.snapshotId}-fusion-detail`">
+                <tr v-for="item in period.fusedCombinations" :key="`${period.snapshotId}-${item.rank}-detail`">
+                  <td>{{ period.predictQiHao }}</td>
+                  <td>{{ item.rank }}</td>
+                  <td>
+                    <HitNumberList :numbers="item.numbers" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                  </td>
+                  <td>{{ item.hitCount }}红 {{ item.hitNumbers.join(',') || '--' }}</td>
+                  <td>{{ formatScore(item.numberScore) }}</td>
+                  <td>{{ formatScore(item.structureScore) }}</td>
+                  <td>{{ formatScore(item.sourceScore) }}</td>
+                  <td>{{ formatScore(item.finalScore) }}</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="mt-3 space-y-1 text-xs text-text-secondary leading-6">
+        <p v-for="item in combinationFusionBacktest.suggestions" :key="item">- {{ item }}</p>
+      </div>
+    </section>
+
+    <!-- 红球组合评分来源权重网格回测 -->
+    <section v-if="isDiagnosticPage && combinationSourceWeightGridBacktest" :class="diagnosticSectionClass('combinationSourceWeightGrid')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">红球组合评分来源权重网格</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            共比较 {{ combinationSourceWeightGridBacktest.optionCount }} 组来源权重；当前最优：{{ combinationSourceWeightGridBacktest.bestOption?.parameterText || '--' }}
+          </p>
+        </div>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('combinationSourceWeightGrid')">
+          {{ diagnosticSectionCollapseText('combinationSourceWeightGrid') }}
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="summary-block">
+          <div class="summary-label">原组合池覆盖率</div>
+          <div class="summary-value">{{ formatPercent(combinationSourceWeightGridBacktest.bestOption?.originalCombinationCoverageRate || 0) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">融合组合覆盖率</div>
+          <div class="summary-value text-accent">{{ formatPercent(combinationSourceWeightGridBacktest.bestOption?.fusedCombinationCoverageRate || 0) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">覆盖提升</div>
+          <div class="summary-value">{{ formatPercent(combinationSourceWeightGridBacktest.bestOption?.coverageLift || 0) }}</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">达到4红期数</div>
+          <div class="summary-value">{{ combinationSourceWeightGridBacktest.bestOption?.reachFourCount || 0 }}/{{ combinationSourceWeightGridBacktest.periodCount }}</div>
+        </div>
+      </div>
+
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ combinationSourceWeightGridBacktest.conclusion }}</p>
+
+      <div class="mt-4 overflow-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>参数</th>
+              <th>原组合覆盖</th>
+              <th>融合组合覆盖</th>
+              <th>提升</th>
+              <th>4红期数</th>
+              <th>观察分</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="option in combinationSourceWeightGridBacktest.topOptions" :key="option.optionCode">
+              <td>{{ option.rank }}</td>
+              <td class="font-bold text-text-primary">{{ option.parameterText }}</td>
+              <td>{{ formatPercent(option.originalCombinationCoverageRate) }}</td>
+              <td class="text-accent font-bold">{{ formatPercent(option.fusedCombinationCoverageRate) }}</td>
+              <td>{{ formatPercent(option.coverageLift) }}</td>
+              <td>{{ option.reachFourCount }}/{{ combinationSourceWeightGridBacktest.periodCount }}</td>
+              <td>{{ formatScore(option.score) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="diagnosis-collapse mt-3">
+        <summary class="diagnosis-summary">
+          <span>展开最优权重单期组合明细</span>
+          <span class="diagnosis-toggle-text">展开</span>
+        </summary>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>融合组合池</th>
+                <th>原组合命中</th>
+                <th>融合组合命中</th>
+                <th>Top融合组合</th>
+                <th>单期判断</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="period in combinationSourceWeightGridBacktest.bestPeriods" :key="`${period.snapshotId}-source-weight`">
+                <td>{{ period.predictQiHao }}</td>
+                <td><HitNumberList :numbers="period.fusedCombinationPool" kind="red" :actual-red-numbers="period.actualRedNumbers" /></td>
+                <td>{{ period.originalCombinationHitNumbers.length }}红 {{ period.originalCombinationHitNumbers.join(',') || '--' }}</td>
+                <td class="text-accent font-bold">{{ period.fusedCombinationHitNumbers.length }}红 {{ period.fusedCombinationHitNumbers.join(',') || '--' }}</td>
+                <td class="table-note">
+                  <div v-for="item in period.fusedCombinations.slice(0, 3)" :key="`${period.snapshotId}-${item.rank}-source-weight`">
+                    第{{ item.rank }}名
+                    <HitNumberList :numbers="item.numbers" kind="red" :actual-red-numbers="period.actualRedNumbers" />
+                    <span> / 分{{ formatScore(item.finalScore) }} / 命中{{ item.hitCount }}红</span>
+                  </div>
+                </td>
+                <td class="table-note">{{ period.conclusion }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- 红球候选池保底扩展回测 -->
+    <section v-if="isDiagnosticPage && activeGuardBacktest" :class="diagnosticSectionClass('guardBacktest')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
+        <h2 class="text-base font-bold text-text-primary">{{ activeGuardBacktestTitle }}</h2>
+        <span class="text-xs text-text-secondary">
+          统计期数：{{ activeGuardBacktest.periodCount }} / 扩展池上限：{{ activeGuardBacktest.maxExpandedSize }}
+        </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('guardBacktest')">
+          {{ diagnosticSectionCollapseText('guardBacktest') }}
+        </button>
+      </div>
+
+      <div v-if="guardBacktestCompareRows.length > 1" class="guard-compare-panel mt-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="summary-label">扩展方式对照</div>
+            <p class="mt-1 text-xs text-text-secondary">
+              顺序版和固定配额版使用同一套展示结构；点击下方方式可切换明细。
+            </p>
+          </div>
+          <div class="guard-mode-tabs">
+            <button
+              v-for="item in guardBacktestCompareRows"
+              :key="item.mode"
+              :class="['guard-mode-tab', { 'guard-mode-tab-active': activeGuardBacktestMode === item.mode }]"
+              @click="switchGuardBacktestMode(item.mode)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
+        <div class="mt-3 overflow-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>方式</th>
+                <th>扩展覆盖率</th>
+                <th>救回红球</th>
+                <th>平均新增</th>
+                <th>有效期数</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in guardBacktestCompareRows"
+                :key="`${item.mode}-compare`"
+                :class="{ 'comparison-row-active': activeGuardBacktestMode === item.mode }"
+                @click="switchGuardBacktestMode(item.mode)"
+              >
+                <td class="font-bold text-text-primary">{{ item.label }}</td>
+                <td class="text-accent">{{ formatPercent(item.result.expandedCoverageRate) }}</td>
+                <td>{{ item.result.rescuedHitCount }}个</td>
+                <td>{{ formatScore(item.result.averageAddedCount) }}个/期</td>
+                <td>{{ item.result.improvedPeriodCount }}/{{ item.result.periodCount }}</td>
+                <td class="table-note">{{ item.description }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="summary-block">
           <div class="summary-label">原候选池覆盖率</div>
           <div class="summary-value">
-            {{ formatPercent(guardBacktest.baseCoverageRate) }}
-            <span class="text-text-secondary">{{ guardBacktest.baseHitCount }}/{{ guardBacktest.actualRedCount }}</span>
+            {{ formatPercent(activeGuardBacktest.baseCoverageRate) }}
+            <span class="text-text-secondary">{{ activeGuardBacktest.baseHitCount }}/{{ activeGuardBacktest.actualRedCount }}</span>
+          </div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">原池单期波动</div>
+          <div class="summary-value">
+            最高{{ guardBacktestBaseCoverageRange?.maxText ?? '--' }}
+          </div>
+          <div class="summary-note">
+            最低{{ guardBacktestBaseCoverageRange?.minText ?? '--' }}，用于观察原候选池是否稳定覆盖。
           </div>
         </div>
         <div class="summary-block">
           <div class="summary-label">扩展后覆盖率</div>
           <div class="summary-value text-accent">
-            {{ formatPercent(guardBacktest.expandedCoverageRate) }}
-            <span class="text-text-secondary">{{ guardBacktest.expandedHitCount }}/{{ guardBacktest.actualRedCount }}</span>
+            {{ formatPercent(activeGuardBacktest.expandedCoverageRate) }}
+            <span class="text-text-secondary">{{ activeGuardBacktest.expandedHitCount }}/{{ activeGuardBacktest.actualRedCount }}</span>
           </div>
         </div>
         <div class="summary-block">
           <div class="summary-label">覆盖提升</div>
           <div class="summary-value text-yellow-400">
-            {{ formatPercent(guardBacktest.coverageLift) }}
-            <span class="text-text-secondary">救回{{ guardBacktest.rescuedHitCount }}个</span>
+            {{ formatPercent(activeGuardBacktest.coverageLift) }}
+            <span class="text-text-secondary">救回{{ activeGuardBacktest.rescuedHitCount }}个</span>
           </div>
         </div>
         <div class="summary-block">
           <div class="summary-label">平均新增</div>
           <div class="summary-value">
-            {{ formatScore(guardBacktest.averageAddedCount) }} 个/期
-            <span class="text-text-secondary">{{ guardBacktest.improvedPeriodCount }}期有效</span>
+            {{ formatScore(activeGuardBacktest.averageAddedCount) }} 个/期
+            <span class="text-text-secondary">{{ activeGuardBacktest.improvedPeriodCount }}期有效</span>
           </div>
         </div>
       </div>
 
-      <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardBacktest.conclusion }}</p>
+      <p class="mt-3 text-xs text-text-secondary leading-6">{{ activeGuardBacktest.conclusion }}</p>
 
       <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="summary-block">
@@ -651,7 +1567,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in guardBacktest.sourceStats" :key="item.sourceType">
+                <tr v-for="item in activeGuardBacktest.sourceStats" :key="item.sourceType">
                   <td>{{ item.sourceName }}</td>
                   <td>{{ item.candidateTimes }}</td>
                   <td>{{ item.candidateHitTimes }} / {{ formatPercent(item.candidateHitRate) }}</td>
@@ -666,7 +1582,7 @@
         <div class="summary-block">
           <div class="summary-label">阶段建议</div>
           <div class="mt-2 space-y-1 text-xs text-text-secondary leading-6">
-            <p v-for="item in guardBacktest.suggestions" :key="item">- {{ item }}</p>
+            <p v-for="item in activeGuardBacktest.suggestions" :key="item">- {{ item }}</p>
           </div>
         </div>
       </div>
@@ -720,7 +1636,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in guardBacktest.periods" :key="item.snapshotId">
+            <tr v-for="item in activeGuardBacktest.periods" :key="item.snapshotId">
               <td>{{ item.predictQiHao }}</td>
               <td>
                 <HitNumberList
@@ -741,12 +1657,15 @@
     </section>
 
     <!-- 红球候选池保底来源配额网格回测：批量比较不同来源配额组合，只作为观察线 -->
-    <section v-if="isDiagnosticPage && guardQuotaGridBacktest" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && guardQuotaGridBacktest" :class="diagnosticSectionClass('guardQuotaGrid')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球候选池保底来源配额网格回测</h2>
         <span class="text-xs text-text-secondary">
           统计期数：{{ guardQuotaGridBacktest.periodCount }} / 测试组合：{{ guardQuotaGridBacktest.optionCount }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('guardQuotaGrid')">
+          {{ diagnosticSectionCollapseText('guardQuotaGrid') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -883,12 +1802,15 @@
     </section>
 
     <!-- 红球保底扩展池压缩回测：观察扩展池能否压缩为9红池和10注6红票面 -->
-    <section v-if="isDiagnosticPage && guardCompressionBacktest" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && guardCompressionBacktest" :class="diagnosticSectionClass('guardCompression')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球保底扩展池压缩回测</h2>
         <span class="text-xs text-text-secondary">
           配额：{{ guardCompressionBacktest.quotaText }} / 统计期数：{{ guardCompressionBacktest.periodCount }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('guardCompression')">
+          {{ diagnosticSectionCollapseText('guardCompression') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -1047,12 +1969,15 @@
     </section>
 
     <!-- 红球保底扩展池压缩策略网格：比较不同压缩权重是否能减少扩展池压缩损失 -->
-    <section v-if="isDiagnosticPage && guardCompressionGridBacktest" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && guardCompressionGridBacktest" :class="diagnosticSectionClass('guardCompressionGrid')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球保底扩展池压缩策略网格</h2>
         <span class="text-xs text-text-secondary">
           配额：{{ guardCompressionGridBacktest.quotaText }} / 策略数：{{ guardCompressionGridBacktest.optionCount }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('guardCompressionGrid')">
+          {{ diagnosticSectionCollapseText('guardCompressionGrid') }}
+        </button>
       </div>
 
       <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardCompressionGridBacktest.conclusion }}</p>
@@ -1193,12 +2118,15 @@
     </section>
 
     <!-- 红球保底扩展池压缩来源最低保留位网格：验证压缩阶段是否需要为某些来源保留最低名额 -->
-    <section v-if="isDiagnosticPage && guardCompressionRetentionGridBacktest" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && guardCompressionRetentionGridBacktest" :class="diagnosticSectionClass('guardCompressionRetentionGrid')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球压缩层来源最低保留位网格</h2>
         <span class="text-xs text-text-secondary">
           配额：{{ guardCompressionRetentionGridBacktest.quotaText }} / 策略数：{{ guardCompressionRetentionGridBacktest.optionCount }}
         </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('guardCompressionRetentionGrid')">
+          {{ diagnosticSectionCollapseText('guardCompressionRetentionGrid') }}
+        </button>
       </div>
 
       <p class="mt-3 text-xs text-text-secondary leading-6">{{ guardCompressionRetentionGridBacktest.conclusion }}</p>
@@ -1341,10 +2269,13 @@
     </section>
 
     <!-- 红球候选池漏号诊断 -->
-    <section v-if="isDiagnosticPage && redMissDiagnosis" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
+    <section v-if="isDiagnosticPage && redMissDiagnosis" :class="diagnosticSectionClass('redMissDiagnosis')">
+      <div class="diagnostic-section-header flex items-center justify-between gap-3">
         <h2 class="text-base font-bold text-text-primary">红球候选池漏号诊断</h2>
         <span class="text-xs text-text-secondary">快照ID：{{ redMissDiagnosis.snapshotId }}</span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('redMissDiagnosis')">
+          {{ diagnosticSectionCollapseText('redMissDiagnosis') }}
+        </button>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1872,6 +2803,7 @@ import { useLotteryStore } from '@/stores/lottery';
 import type { DrawRecord } from '@/types';
 import {
   diagnoseRedCandidateMiss,
+  getBlueCandidateDiagnosis,
   getRedBayesColdHotDiagnosis,
   getRedCandidateGuardBacktest,
   getRedCandidateGuardCompressionBacktest,
@@ -1881,6 +2813,12 @@ import {
   getRedCandidateGuardQuotaBacktest,
   getPredictionReviewTrend,
   getRedCandidateMissDistribution,
+  getRedCandidateFunnelDiagnosis,
+  getRedCandidateEntryFusionBacktest,
+  getRedCandidateEntryFusionGridBacktest,
+  getRedCandidateEntryRescoreFusionBacktest,
+  getRedCandidateCombinationFusionBacktest,
+  getRedCandidateCombinationSourceWeightGridBacktest,
   getLatestPredictionSnapshots,
   getMultiWindowFinalPredict,
   getNinePlusOnePredict,
@@ -1891,6 +2829,7 @@ import {
   savePredictionSnapshot,
   syncDefaultAxisChains,
   syncRed10AxisChain,
+  type BlueCandidateDiagnosisResult,
   type MultiWindowFinalPredictResult,
   type PredictionSnapshotEntity,
   type PredictionSnapshotReviewResult,
@@ -1898,6 +2837,9 @@ import {
   type PredictionSnapshotTrendResult,
   type RedCandidateMissDiagnosisResult,
   type RedCandidateMissDistributionResult,
+  type RedCandidateFunnelDiagnosisResult,
+  type RedCandidateFusionBacktestResult,
+  type RedCandidateFusionGridBacktestResult,
   type RedCandidateGuardBacktestResult,
   type RedCandidateGuardCompressionBacktestResult,
   type RedCandidateGuardCompressionGridBacktestResult,
@@ -1920,12 +2862,19 @@ const reviewing = ref(false);
 const diagnosing = ref(false);
 const trendLoading = ref(false);
 const distributionLoading = ref(false);
+const funnelDiagnosisLoading = ref(false);
+const entryFusionLoading = ref(false);
+const entryRescoreFusionLoading = ref(false);
+const entryFusionGridLoading = ref(false);
+const combinationFusionLoading = ref(false);
+const combinationSourceWeightGridLoading = ref(false);
 const guardBacktestLoading = ref(false);
 const guardQuotaGridLoading = ref(false);
 const guardCompressionLoading = ref(false);
 const guardCompressionGridLoading = ref(false);
 const guardCompressionRetentionGridLoading = ref(false);
 const bayesLoading = ref(false);
+const blueDiagnosisLoading = ref(false);
 const diagnosticSnapshotLoading = ref(false);
 const drawLoading = ref(false);
 const axisSyncLoading = ref(false);
@@ -1943,21 +2892,165 @@ const reviewResult = ref<PredictionSnapshotReviewResult | null>(null);
 const reviewTrend = ref<PredictionSnapshotTrendResult | null>(null);
 const redMissDiagnosis = ref<RedCandidateMissDiagnosisResult | null>(null);
 const redMissDistribution = ref<RedCandidateMissDistributionResult | null>(null);
+const redFunnelDiagnosis = ref<RedCandidateFunnelDiagnosisResult | null>(null);
+const entryFusionBacktest = ref<RedCandidateFusionBacktestResult | null>(null);
+const entryRescoreFusionBacktest = ref<RedCandidateFusionBacktestResult | null>(null);
+const entryFusionGridBacktest = ref<RedCandidateFusionGridBacktestResult | null>(null);
+const combinationFusionBacktest = ref<RedCandidateFusionBacktestResult | null>(null);
+const combinationSourceWeightGridBacktest = ref<RedCandidateFusionGridBacktestResult | null>(null);
 const guardBacktest = ref<RedCandidateGuardBacktestResult | null>(null);
+const guardQuotaBacktest = ref<RedCandidateGuardBacktestResult | null>(null);
 const guardQuotaGridBacktest = ref<RedCandidateGuardQuotaGridBacktestResult | null>(null);
 const guardCompressionBacktest = ref<RedCandidateGuardCompressionBacktestResult | null>(null);
 const guardCompressionGridBacktest = ref<RedCandidateGuardCompressionGridBacktestResult | null>(null);
 const guardCompressionRetentionGridBacktest = ref<RedCandidateGuardCompressionRetentionGridBacktestResult | null>(null);
-const guardBacktestTitle = ref('红球候选池保底扩展回测');
+const activeGuardBacktestMode = ref<'basic' | 'quota'>('basic');
 const bayesDiagnosis = ref<RedBayesDiagnosisResult | null>(null);
+const blueCandidateDiagnosis = ref<BlueCandidateDiagnosisResult | null>(null);
 const axisSyncResults = ref<WindowAxisChainResult[]>([]);
 const snapshots = ref<PredictionSnapshotEntity[]>([]);
 const viewMode = ref<'realtime' | 'snapshot'>('realtime');
 const emptySourceContributionStats: RedCandidateGuardSourceContribution[] = [];
+const collapsedDiagnosticSections = ref<Set<string>>(new Set());
+const diagnosticPackSavedSnapshotId = ref<number | null>(null);
+
+type WorkflowStepStatus = 'done' | 'pending' | 'waiting' | 'unknown';
+
+interface WorkflowStep {
+  key: string;
+  title: string;
+  status: WorkflowStepStatus;
+  statusText: string;
+  description: string;
+}
+
+interface DiagnosticGuideItem {
+  order: string;
+  title: string;
+  description: string;
+}
+
+type StrategyAdmissionStatus = 'pass' | 'observe' | 'fail' | 'unknown';
+
+interface StrategyAdmissionCheck {
+  title: string;
+  status: StrategyAdmissionStatus;
+  statusText: string;
+  description: string;
+}
+
+interface DiagnosticMetricGuideItem {
+  title: string;
+  formula: string;
+  description: string;
+  watchPoint: string;
+}
+
+/**
+ * 判断诊断结果区是否已经收起。
+ * @param key 诊断结果区唯一标识
+ * @returns 是否处于收起状态
+ */
+function isDiagnosticSectionCollapsed(key: string) {
+  return collapsedDiagnosticSections.value.has(key);
+}
+
+/**
+ * 切换诊断结果区的收起状态。
+ * @description 只控制前端展示，不会清空接口结果，也不会触发重新计算。
+ * @param key 诊断结果区唯一标识
+ */
+function toggleDiagnosticSectionCollapse(key: string) {
+  const nextKeys = new Set(collapsedDiagnosticSections.value);
+  if (nextKeys.has(key)) {
+    nextKeys.delete(key);
+  } else {
+    nextKeys.add(key);
+  }
+  collapsedDiagnosticSections.value = nextKeys;
+}
+
+/**
+ * 获取诊断结果区外层样式。
+ * @param key 诊断结果区唯一标识
+ * @returns Vue class 绑定对象
+ */
+function diagnosticSectionClass(key: string) {
+  return [
+    'bg-bg-card rounded-lg p-4 diagnostic-result-section',
+    { 'diagnostic-section-collapsed': isDiagnosticSectionCollapsed(key) }
+  ];
+}
+
+/**
+ * 获取诊断结果区折叠按钮文案。
+ * @param key 诊断结果区唯一标识
+ * @returns 当前按钮文案
+ */
+function diagnosticSectionCollapseText(key: string) {
+  return isDiagnosticSectionCollapsed(key) ? '展开' : '收起';
+}
+
+const activeGuardBacktest = computed(() =>
+  activeGuardBacktestMode.value === 'quota' ? guardQuotaBacktest.value : guardBacktest.value
+);
+
+const activeGuardBacktestTitle = computed(() =>
+  activeGuardBacktestMode.value === 'quota' ? '红球候选池保底来源配额回测' : '红球候选池保底扩展回测'
+);
+
+const guardBacktestCompareRows = computed(() => {
+  const rows: Array<{
+    mode: 'basic' | 'quota';
+    label: string;
+    description: string;
+    result: RedCandidateGuardBacktestResult;
+  }> = [];
+  if (guardBacktest.value) {
+    rows.push({
+      mode: 'basic',
+      label: '顺序版',
+      description: '按来源顺序补入扩展池，作为基础对照组。',
+      result: guardBacktest.value
+    });
+  }
+  if (guardQuotaBacktest.value) {
+    rows.push({
+      mode: 'quota',
+      label: '固定配额版',
+      description: '给重号、邻号、贝叶斯等来源固定新增名额，观察配额是否更稳。',
+      result: guardQuotaBacktest.value
+    });
+  }
+  return rows;
+});
 
 const guardSourceContributionStats = computed(() =>
-  guardBacktest.value?.sourceContributionStats ?? emptySourceContributionStats
+  activeGuardBacktest.value?.sourceContributionStats ?? emptySourceContributionStats
 );
+
+const guardBacktestBaseCoverageRange = computed(() => {
+  const periods = activeGuardBacktest.value?.periods ?? [];
+  if (!periods.length) {
+    return null;
+  }
+
+  // 每期真实红球通常为6个；仍以接口返回的实际红球数量为准，避免异常数据导致分母写死。
+  const hitItems = periods.map(item => {
+    const actualCount = item.actualRedNumbers?.length || 6;
+    return {
+      hitCount: item.baseHitCount,
+      actualCount
+    };
+  });
+  const maxItem = hitItems.reduce((best, item) => item.hitCount > best.hitCount ? item : best, hitItems[0]);
+  const minItem = hitItems.reduce((best, item) => item.hitCount < best.hitCount ? item : best, hitItems[0]);
+
+  return {
+    maxText: `${maxItem.hitCount}/${maxItem.actualCount}`,
+    minText: `${minItem.hitCount}/${minItem.actualCount}`
+  };
+});
 
 const guardQuotaBestSourceContributionStats = computed(() =>
   guardQuotaGridBacktest.value?.bestSourceContributionStats ?? emptySourceContributionStats
@@ -1976,19 +3069,26 @@ const guardCompressionRetentionGridBestSourceContributionStats = computed(() =>
 );
 
 /**
- * 是否已打开普通保底扩展回测结果。
- * @description 普通保底和配额保底共用一个结果区域，因此需要用标题区分当前打开的是哪一种结果。
+ * 是否已打开保底扩展对照结果。
+ * @description 顺序版和固定配额版共用一个结果区域，打开后可在区域内切换明细。
  */
 const isGuardBacktestOpen = computed(() => {
-  return Boolean(guardBacktest.value && guardBacktestTitle.value === '红球候选池保底扩展回测');
+  return Boolean(guardBacktest.value || guardQuotaBacktest.value);
 });
 
 /**
- * 是否已打开保底来源配额回测结果。
+ * 切换保底扩展回测的当前展示方式。
+ * @param mode 扩展方式
  */
-const isGuardQuotaBacktestOpen = computed(() => {
-  return Boolean(guardBacktest.value && guardBacktestTitle.value === '红球候选池保底来源配额回测');
-});
+function switchGuardBacktestMode(mode: 'basic' | 'quota') {
+  if (mode === 'quota' && !guardQuotaBacktest.value) {
+    return;
+  }
+  if (mode === 'basic' && !guardBacktest.value) {
+    return;
+  }
+  activeGuardBacktestMode.value = mode;
+}
 
 /**
  * 当前模型工作台页面模式。
@@ -2167,6 +3267,67 @@ const TicketNumberText = defineComponent({
 });
 
 /**
+ * 从票面文本中解析红球和蓝球。
+ * @description 多期复盘趋势里后端给的是完整票面文本，这里统一拆成红球数组和蓝球，方便复用命中标色组件。
+ * @param ticketText 形如“01,02,03,04,05,06 + 07”的票面文本
+ * @returns 解析后的红球数组和蓝球
+ */
+function parseTicketText(ticketText?: string | null) {
+  // 空文本返回空票面，调用处会展示原始占位。
+  if (!ticketText) {
+    return { redNumbers: [] as string[], blueNumber: '' };
+  }
+
+  // 按加号拆分红球区和蓝球区，同时兼容中文全角加号。
+  const [redPart = '', bluePart = ''] = ticketText.split(/[+＋]/);
+  // 只提取两位数字，避免逗号、空格和中文说明影响解析。
+  const redNumbers = (redPart.match(/\d{2}/g) ?? []).slice(0, 6);
+  // 蓝球优先取加号右侧；如果没有加号，则退回整段文本中的第七个两位数。
+  const blueNumber = (bluePart.match(/\d{2}/g) ?? [])[0]
+    ?? (ticketText.match(/\d{2}/g) ?? [])[6]
+    ?? '';
+
+  return { redNumbers, blueNumber };
+}
+
+/**
+ * 文本票面命中渲染组件。
+ * @description 用于复盘趋势等只拿到票面文本的表格列，将命中的红球渲染为红色、命中的蓝球渲染为蓝色。
+ */
+const TicketTextByText = defineComponent({
+  name: 'TicketTextByText',
+  props: {
+    ticketText: {
+      type: String,
+      required: true
+    },
+    actualTicketText: {
+      type: String,
+      required: true
+    }
+  },
+  setup(props) {
+    return () => {
+      // 解析预测票面和实际开奖票面。
+      const ticket = parseTicketText(props.ticketText);
+      const actualTicket = parseTicketText(props.actualTicketText);
+
+      // 无法解析时保留原始文本，避免因为异常格式导致页面空白。
+      if (ticket.redNumbers.length === 0) {
+        return h('span', props.ticketText || '--');
+      }
+
+      return h(TicketNumberText, {
+        redNumbers: ticket.redNumbers,
+        blueNumber: ticket.blueNumber,
+        actualRedNumbers: actualTicket.redNumbers,
+        actualBlueNumber: actualTicket.blueNumber
+      });
+    };
+  }
+});
+
+/**
  * 最新开奖数据
  */
 const latestDraw = computed(() => lotteryStore.latestDraw);
@@ -2216,6 +3377,289 @@ const predictionNeedsWindowSync = computed(() => {
     && latestDraw.value.qiHao === currentPredictQiHao.value
   );
 });
+
+/**
+ * 当前快照是否已经完成复盘。
+ * @description 优先读取快照持久化状态，同时兼容本页刚执行完成但列表尚未刷新的复盘结果。
+ */
+const activeSnapshotReviewed = computed(() => {
+  return Boolean(activeSnapshot.value?.reviewStatus === 1 || reviewResult.value);
+});
+
+/**
+ * 当前快照是否已经在本次页面会话中保存过诊断包。
+ * @description 诊断包保存结果暂不反查数据库，只对当前会话给出明确完成提示，避免误判历史状态。
+ */
+const activeDiagnosticPackSaved = computed(() => {
+  return Boolean(activeSnapshot.value?.id && diagnosticPackSavedSnapshotId.value === activeSnapshot.value.id);
+});
+
+/**
+ * 最新预测是否已经进入下一期开奖期号。
+ */
+const currentPredictionIsNextPeriod = computed(() => {
+  if (!latestDraw.value?.qiHao || !currentPredictQiHao.value) {
+    return false;
+  }
+  return Number(currentPredictQiHao.value) > Number(latestDraw.value.qiHao);
+});
+
+/**
+ * 当前页面的开奖后执行链状态。
+ * @description 用于提醒人工操作顺序，不触发接口，也不修改任何预测结果。
+ */
+const postDrawWorkflowSteps = computed<WorkflowStep[]>(() => {
+  const hasDraw = Boolean(latestDraw.value?.qiHao);
+  const hasSnapshot = Boolean(activeSnapshot.value);
+  const hasActualForSnapshot = Boolean(activeSnapshot.value && hasActualDraw(activeSnapshot.value.predictQiHao));
+  const hasNextSnapshot = Boolean(
+    latestSnapshot.value?.predictQiHao
+    && latestDraw.value?.qiHao
+    && Number(latestSnapshot.value.predictQiHao) > Number(latestDraw.value.qiHao)
+  );
+
+  return [
+    {
+      key: 'draw',
+      title: '开奖信息',
+      status: hasDraw ? 'done' : 'pending',
+      statusText: hasDraw ? '已读取' : '待同步',
+      description: hasDraw ? `最新开奖 ${latestDraw.value?.qiHao}` : '先同步最新开奖数据。'
+    },
+    {
+      key: 'window',
+      title: '窗口基础',
+      status: predictionNeedsWindowSync.value ? 'pending' : (hasDraw ? 'done' : 'waiting'),
+      statusText: predictionNeedsWindowSync.value ? '待推进' : (hasDraw ? '已就绪' : '等待开奖'),
+      description: predictionNeedsWindowSync.value ? '预测期号仍追平开奖期号。' : '窗口期号未显示明显滞后。'
+    },
+    {
+      key: 'review',
+      title: '快照复盘',
+      status: activeSnapshotReviewed.value ? 'done' : (hasSnapshot && hasActualForSnapshot ? 'pending' : 'waiting'),
+      statusText: activeSnapshotReviewed.value ? '已复盘' : (hasSnapshot && hasActualForSnapshot ? '可复盘' : '等待快照'),
+      description: activeSnapshotReviewed.value ? '可继续保存诊断包。' : '复盘必须基于开奖前快照。'
+    },
+    {
+      key: 'diagnosticPack',
+      title: '诊断包',
+      status: activeDiagnosticPackSaved.value ? 'done' : (activeSnapshotReviewed.value ? 'pending' : 'waiting'),
+      statusText: activeDiagnosticPackSaved.value ? '本次已保存' : (activeSnapshotReviewed.value ? '建议保存' : '等待复盘'),
+      description: activeDiagnosticPackSaved.value ? '已沉淀本页诊断证据。' : '保存后便于后续跨期比较。'
+    },
+    {
+      key: 'axis',
+      title: '结构链',
+      status: axisSyncResults.value.length > 0 ? 'done' : (activeSnapshotReviewed.value ? 'pending' : 'waiting'),
+      statusText: axisSyncResults.value.length > 0 ? '已同步' : (activeSnapshotReviewed.value ? '待同步' : '等待复盘'),
+      description: axisSyncResults.value.length > 0 ? '结构链已面向下一期刷新。' : '通常放在复盘分析后执行。'
+    },
+    {
+      key: 'nextSnapshot',
+      title: '下一期快照',
+      status: hasNextSnapshot ? 'done' : (currentPredictionIsNextPeriod.value ? 'pending' : 'waiting'),
+      statusText: hasNextSnapshot ? '已保存' : (currentPredictionIsNextPeriod.value ? '待保存' : '等待刷新'),
+      description: hasNextSnapshot ? `快照 ${latestSnapshot.value?.predictQiHao}` : '刷新下一期预测后保存。'
+    }
+  ];
+});
+
+/**
+ * 执行链完成数量摘要。
+ */
+const workflowSummaryText = computed(() => {
+  const steps = postDrawWorkflowSteps.value;
+  const doneCount = steps.filter(item => item.status === 'done').length;
+  return `已完成 ${doneCount}/${steps.length}`;
+});
+
+/**
+ * 诊断研究台推荐阅读顺序。
+ */
+const diagnosticGuideItems: DiagnosticGuideItem[] = [
+  {
+    order: '1',
+    title: '多期趋势',
+    description: '先判断主推荐、9+1、10注和蓝球是否真的变好。'
+  },
+  {
+    order: '2',
+    title: '阶段漏斗',
+    description: '再看真实红球是在入口池、组合池、扩展池还是出票池被丢掉。'
+  },
+  {
+    order: '3',
+    title: '保底扩展',
+    description: '确认重号、邻号、贝叶斯等来源是否能救回漏号。'
+  },
+  {
+    order: '4',
+    title: '压缩回测',
+    description: '观察扩展池能否被压缩成9红或10注票面。'
+  },
+  {
+    order: '5',
+    title: '入口融合',
+    description: '比较TopN和来源配额，寻找更好的候选入口。'
+  },
+  {
+    order: '6',
+    title: '贝叶斯冷热',
+    description: '作为解释和保底来源，不单独决定出票。'
+  }
+];
+
+/**
+ * 诊断指标速读说明。
+ * @description 用固定解释降低诊断页面的阅读成本，不参与任何预测计算。
+ */
+const diagnosticMetricGuideItems: DiagnosticMetricGuideItem[] = [
+  {
+    title: '覆盖率',
+    formula: '覆盖率 = 命中红球数 / 实际红球数',
+    description: '表示某个候选池覆盖了本期真实6个红球中的多少个。例如4/6就是覆盖率66.67%。',
+    watchPoint: '当前阶段优先看能否稳定达到4红覆盖，而不是只看某一期是否中奖。'
+  },
+  {
+    title: '入口池',
+    formula: '入口池 = 第一阶段入围红球',
+    description: '通常来自红10单号评分TopN，决定后续组合能从哪些号码里挑选。',
+    watchPoint: '如果入口池漏掉真实红球，后面的组合评分再好也很难救回来。'
+  },
+  {
+    title: '原候选池',
+    formula: '原候选池 = 主模型高分6红组合的并集',
+    description: '它不是单注票面，而是主模型认为较强的一批6红组合合并后的候选范围。',
+    watchPoint: '如果入口有命中但原候选池变差，说明组合排序或三窗口结构分可能刷掉了有效号码。'
+  },
+  {
+    title: '保底扩展池',
+    formula: '扩展池 = 原候选池 + 重号/邻号/贝叶斯等来源',
+    description: '用于观察遗漏号码能否被其他来源救回，当前不直接等于正式出票。',
+    watchPoint: '扩展池覆盖高只说明有救回能力，还要继续看能否压缩成9红或10注。'
+  },
+  {
+    title: '压缩9红/10注',
+    formula: '压缩 = 从扩展池缩小到可购买规模',
+    description: '9红对应复式观察池，10注对应单式票面池，核心难点是保留扩展池救回的号码。',
+    watchPoint: '如果扩展池4红但压缩后只剩2到3红，问题就在压缩策略。'
+  },
+  {
+    title: '有效期数',
+    formula: '有效期数 = 扩展或压缩后命中变好的期数',
+    description: '用于判断某个策略是不是多期都能改善，而不是单期碰巧提升。',
+    watchPoint: '至少观察6到7个已复盘样本，再讨论是否进入正式预测。'
+  },
+  {
+    title: '来源配额',
+    formula: '配额 = 每类来源最多补入几个号码',
+    description: '例如重3/邻3/贝3表示重号、邻号、贝叶斯Top各最多补入3个候选。',
+    watchPoint: '配额的意义是避免某一种来源挤满扩展池，导致其他有效来源进不来。'
+  },
+  {
+    title: '观察线',
+    formula: '观察线 = 只回测和解释，不改正式票面',
+    description: '诊断研究台的大部分策略都先进入观察线，只有持续有效才考虑升级模型版本。',
+    watchPoint: '进入正式预测前必须有多期证据、策略记录，并明确是否提升模型版本。'
+  }
+];
+
+/**
+ * 策略准入检查项。
+ * @description 只根据当前已加载诊断结果给出提示，不自动修改正式预测模型。
+ */
+const strategyAdmissionChecks = computed<StrategyAdmissionCheck[]>(() => {
+  const sampleCount = Math.max(
+    reviewTrend.value?.periodCount ?? 0,
+    redFunnelDiagnosis.value?.periodCount ?? 0,
+    blueCandidateDiagnosis.value?.periodCount ?? 0
+  );
+  const expandedStage = redFunnelDiagnosis.value?.stageSummaries?.find(item => item.stageCode === 'GUARD_EXPANDED_POOL');
+  const compressedStage = redFunnelDiagnosis.value?.stageSummaries?.find(item => item.stageCode === 'COMPRESSED_NINE_POOL');
+  const singleStage = redFunnelDiagnosis.value?.stageSummaries?.find(item => item.stageCode === 'SINGLE_TICKET_POOL');
+  const expandedReachFourRate = expandedStage && redFunnelDiagnosis.value?.periodCount
+    ? expandedStage.reachFourCount / redFunnelDiagnosis.value.periodCount
+    : null;
+  const compressedReachThreeRate = compressedStage && redFunnelDiagnosis.value?.periodCount
+    ? compressedStage.reachThreeCount / redFunnelDiagnosis.value.periodCount
+    : null;
+  const singleReachThreeRate = singleStage && redFunnelDiagnosis.value?.periodCount
+    ? singleStage.reachThreeCount / redFunnelDiagnosis.value.periodCount
+    : null;
+
+  return [
+    {
+      title: '样本数量',
+      status: sampleCount >= 7 ? 'pass' : sampleCount >= 5 ? 'observe' : 'unknown',
+      statusText: sampleCount > 0 ? `${sampleCount}期` : '待加载',
+      description: '正式升级前至少观察6-7期，避免被单期波动误导。'
+    },
+    {
+      title: '红球扩展覆盖',
+      status: expandedReachFourRate == null ? 'unknown' : expandedReachFourRate >= 0.7 ? 'pass' : 'observe',
+      statusText: expandedReachFourRate == null ? '待阶段漏斗' : `4红率 ${formatPercent(expandedReachFourRate)}`,
+      description: '保底扩展池需要稳定把候选覆盖推到4红附近，才有继续压缩的价值。'
+    },
+    {
+      title: '压缩不回落',
+      status: compressedReachThreeRate == null || singleReachThreeRate == null
+        ? 'unknown'
+        : (compressedReachThreeRate >= 0.6 && singleReachThreeRate >= 0.6 ? 'pass' : 'observe'),
+      statusText: compressedReachThreeRate == null || singleReachThreeRate == null
+        ? '待阶段漏斗'
+        : `9红 ${formatPercent(compressedReachThreeRate)} / 10注 ${formatPercent(singleReachThreeRate)}`,
+      description: '扩展池救回的号码必须尽量留到9红和10注里，否则不能进入正式出票。'
+    },
+    {
+      title: '蓝球不拖后腿',
+      status: !blueCandidateDiagnosis.value
+        ? 'unknown'
+        : (blueCandidateDiagnosis.value.candidateHitRate >= 0.5 && blueCandidateDiagnosis.value.top3HitRate >= 0.5 ? 'pass' : 'observe'),
+      statusText: !blueCandidateDiagnosis.value
+        ? '待蓝球诊断'
+        : `候选 ${formatPercent(blueCandidateDiagnosis.value.candidateHitRate)} / Top3 ${formatPercent(blueCandidateDiagnosis.value.top3HitRate)}`,
+      description: '红球改善但蓝球候选仍经常未覆盖时，不能把整体模型判定为可升级。'
+    },
+    {
+      title: '文档与版本',
+      status: 'pass',
+      statusText: '已纳入纪律',
+      description: '策略升级必须先写策略决策记录，并明确模型版本变化。'
+    }
+  ];
+});
+
+/**
+ * 策略准入总体状态。
+ */
+const strategyAdmissionState = computed<StrategyAdmissionStatus>(() => {
+  const checks = strategyAdmissionChecks.value;
+  if (checks.some(item => item.status === 'fail')) {
+    return 'fail';
+  }
+  if (checks.some(item => item.status === 'unknown')) {
+    return 'unknown';
+  }
+  return checks.every(item => item.status === 'pass') ? 'pass' : 'observe';
+});
+
+/**
+ * 策略准入状态文案。
+ */
+const strategyAdmissionStateText = computed(() => {
+  const stateTextMap: Record<StrategyAdmissionStatus, string> = {
+    pass: '可考虑升级',
+    observe: '继续观察',
+    fail: '不建议升级',
+    unknown: '证据不足'
+  };
+  return stateTextMap[strategyAdmissionState.value];
+});
+
+/**
+ * 策略准入状态样式。
+ */
+const strategyAdmissionStateClass = computed(() => `strategy-admission-badge-${strategyAdmissionState.value}`);
 
 /**
  * 漏号分布展示分组
@@ -2284,6 +3728,33 @@ function formatPercent(value?: number | null): string {
 }
 
 /**
+ * 格式化阶段漏斗相邻阶段命中变化。
+ * @param delta 命中数量变化
+ * @returns 带正负号的变化文本
+ */
+function funnelDeltaText(delta?: number | null): string {
+  if (typeof delta !== 'number') {
+    return '--';
+  }
+  if (delta > 0) {
+    return `+${delta}`;
+  }
+  return String(delta);
+}
+
+/**
+ * 获取阶段漏斗命中变化样式。
+ * @param delta 命中数量变化
+ * @returns 样式类名
+ */
+function funnelDeltaClass(delta?: number | null): string {
+  if (typeof delta !== 'number' || delta === 0) {
+    return 'text-text-secondary font-bold';
+  }
+  return delta > 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold';
+}
+
+/**
  * 将后端返回的分布对象转换为可渲染数组
  * @param distribution 分布对象
  * @returns 排序后的键值数组
@@ -2304,6 +3775,57 @@ function distributionEntries(distribution?: Record<number, number> | null): Arra
  */
 function drawRedText(draw: DrawRecord): string {
   return [draw.red1, draw.red2, draw.red3, draw.red4, draw.red5, draw.red6].join(',');
+}
+
+/**
+ * 格式化开奖完整票面文本。
+ * @param draw 开奖记录
+ * @returns 红球加蓝球的完整票面
+ */
+function drawTicketText(draw: DrawRecord): string {
+  return `${drawRedText(draw)} + ${draw.blue}`;
+}
+
+/**
+ * 按期号查找本地开奖完整票面。
+ * @description 快照列表中每行期号不同，需要按期号寻找对应开奖，才能给推荐票面做命中标色。
+ * @param qiHao 预测期号
+ * @returns 找到时返回完整开奖号，否则返回空字符串
+ */
+function drawTicketTextByQiHao(qiHao?: string | null): string {
+  // 没有期号时无法匹配开奖。
+  if (!qiHao) {
+    return '';
+  }
+
+  // 优先从本地全量开奖缓存中查找。
+  const matchedDraw = lotteryStore.drawRecords.find(record => record.qiHao === qiHao);
+  if (matchedDraw) {
+    return drawTicketText(matchedDraw);
+  }
+
+  // 本地全量缓存未命中时，使用最新开奖兜底。
+  if (lotteryStore.latestDraw?.qiHao === qiHao) {
+    return drawTicketText(lotteryStore.latestDraw);
+  }
+
+  return '';
+}
+
+/**
+ * 获取快照对应的实际开奖票面。
+ * @description 已复盘快照优先使用复盘摘要中的开奖号；未复盘但本地有开奖时再从开奖缓存读取。
+ * @param snapshot 预测快照
+ * @returns 实际开奖票面文本
+ */
+function snapshotActualTicketText(snapshot: PredictionSnapshotEntity): string {
+  // 已复盘快照里保存了开奖前快照对应的真实开奖，优先使用它避免本地缓存缺失。
+  const snapshotReview = parseSnapshotJson<PredictionSnapshotReviewResult>(snapshot.reviewSummaryJson);
+  if (snapshotReview?.actualRedNumbers?.length) {
+    return `${formatList(snapshotReview.actualRedNumbers)} + ${snapshotReview.actualBlueNumber}`;
+  }
+
+  return drawTicketTextByQiHao(snapshot.predictQiHao);
 }
 
 /**
@@ -2695,6 +4217,39 @@ async function toggleBayesDiagnosis() {
 }
 
 /**
+ * 加载蓝球候选池独立诊断。
+ */
+async function loadBlueCandidateDiagnosis() {
+  blueDiagnosisLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getBlueCandidateDiagnosis(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '蓝球候选池独立诊断失败');
+    }
+    blueCandidateDiagnosis.value = res.data;
+    showMessage('蓝球独立诊断完成，当前只作为观察层，不改变正式预测', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '蓝球候选池独立诊断失败', 'error');
+  } finally {
+    blueDiagnosisLoading.value = false;
+  }
+}
+
+/**
+ * 切换蓝球候选池独立诊断区域。
+ * @description 已打开时再次点击只关闭页面结果，不重新请求后端。
+ */
+async function toggleBlueCandidateDiagnosis() {
+  if (blueCandidateDiagnosis.value) {
+    blueCandidateDiagnosis.value = null;
+    showMessage('已关闭蓝球独立诊断', 'success');
+    return;
+  }
+  await loadBlueCandidateDiagnosis();
+}
+
+/**
  * 保存当前快照的复盘诊断包
  * @description 一次性沉淀复盘趋势、漏号分布、保底扩展回测和当前贝叶斯冷热，供后续研究复查。
  */
@@ -2717,6 +4272,7 @@ async function saveDiagnosticReviewPack() {
     }
 
     const typeText = (res.data ?? []).map(item => item.diagnosticType).join('、');
+    diagnosticPackSavedSnapshotId.value = activeSnapshot.value.id;
     showMessage(`诊断包保存成功：${typeText || '复盘趋势、漏号分布、保底扩展、贝叶斯冷热'}`, 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '保存诊断包失败，请确认后端已重启到最新代码', 'error');
@@ -2767,11 +4323,19 @@ async function loadPredictionInternal(useExistingSnapshot: boolean) {
     reviewTrend.value = null;
     redMissDistribution.value = null;
     guardBacktest.value = null;
+    guardQuotaBacktest.value = null;
     guardQuotaGridBacktest.value = null;
     guardCompressionBacktest.value = null;
     guardCompressionGridBacktest.value = null;
     guardCompressionRetentionGridBacktest.value = null;
+    entryFusionBacktest.value = null;
+    entryRescoreFusionBacktest.value = null;
+    entryFusionGridBacktest.value = null;
+    combinationFusionBacktest.value = null;
+    combinationSourceWeightGridBacktest.value = null;
+    redFunnelDiagnosis.value = null;
     bayesDiagnosis.value = null;
+    blueCandidateDiagnosis.value = null;
     viewMode.value = 'realtime';
 
     if (useExistingSnapshot) {
@@ -2875,69 +4439,243 @@ async function toggleMissDistribution() {
 }
 
 /**
- * 加载红球候选池保底扩展回测
+ * 加载红球候选池阶段漏斗诊断。
  */
-async function loadGuardBacktest() {
+async function loadFunnelDiagnosis() {
+  funnelDiagnosisLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateFunnelDiagnosis(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '红球候选池阶段漏斗诊断失败');
+    }
+    redFunnelDiagnosis.value = res.data;
+    showMessage('阶段漏斗诊断完成，可查看入口、组合、扩展和出票阶段的覆盖变化', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '红球候选池阶段漏斗诊断失败', 'error');
+  } finally {
+    funnelDiagnosisLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球候选池阶段漏斗诊断区域。
+ */
+async function toggleFunnelDiagnosis() {
+  if (redFunnelDiagnosis.value) {
+    redFunnelDiagnosis.value = null;
+    showMessage('已关闭阶段漏斗诊断', 'success');
+    return;
+  }
+  await loadFunnelDiagnosis();
+}
+
+/**
+ * 加载红球入口池融合回测。
+ * @description 只比较红10入口Top15和“红10Top15+重号/邻号/贝叶斯配额”的覆盖差异。
+ */
+async function loadEntryFusionBacktest() {
+  entryFusionLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateEntryFusionBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '入口池融合回测失败');
+    }
+    entryFusionBacktest.value = res.data;
+    showMessage('入口池融合回测完成，可查看红10入口补强前后的覆盖变化', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '入口池融合回测失败', 'error');
+  } finally {
+    entryFusionLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球入口池融合回测区域。
+ */
+async function toggleEntryFusionBacktest() {
+  if (entryFusionBacktest.value) {
+    entryFusionBacktest.value = null;
+    showMessage('已关闭入口池融合回测', 'success');
+    return;
+  }
+  await loadEntryFusionBacktest();
+}
+
+/**
+ * 加载红球入口池重评分融合回测。
+ * @description 用红10单号分叠加重号、邻号、贝叶斯来源分后重新排序，再观察Top15入口覆盖。
+ */
+async function loadEntryRescoreFusionBacktest() {
+  entryRescoreFusionLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateEntryRescoreFusionBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '入口重评分融合回测失败');
+    }
+    entryRescoreFusionBacktest.value = res.data;
+    showMessage('入口重评分融合回测完成，可查看重评分后入口池是否提升覆盖', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '入口重评分融合回测失败', 'error');
+  } finally {
+    entryRescoreFusionLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球入口池重评分融合回测区域。
+ */
+async function toggleEntryRescoreFusionBacktest() {
+  if (entryRescoreFusionBacktest.value) {
+    entryRescoreFusionBacktest.value = null;
+    showMessage('已关闭入口重评分融合回测', 'success');
+    return;
+  }
+  await loadEntryRescoreFusionBacktest();
+}
+
+/**
+ * 加载红10TopN与来源配额入口融合网格。
+ * @description 比较Top12/15/18与重号、邻号、贝叶斯不同配额组合的入口覆盖差异。
+ */
+async function loadEntryFusionGridBacktest() {
+  entryFusionGridLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateEntryFusionGridBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '入口融合网格回测失败');
+    }
+    entryFusionGridBacktest.value = res.data;
+    showMessage('入口融合网格回测完成，可比较TopN和来源配额的稳定性', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '入口融合网格回测失败', 'error');
+  } finally {
+    entryFusionGridLoading.value = false;
+  }
+}
+
+/**
+ * 切换红10TopN与来源配额入口融合网格区域。
+ */
+async function toggleEntryFusionGridBacktest() {
+  if (entryFusionGridBacktest.value) {
+    entryFusionGridBacktest.value = null;
+    showMessage('已关闭入口融合网格回测', 'success');
+    return;
+  }
+  await loadEntryFusionGridBacktest();
+}
+
+/**
+ * 加载红球组合评分融合回测。
+ * @description 让保底来源分参与组合排序，观察是否优于原红球组合池。
+ */
+async function loadCombinationFusionBacktest() {
+  combinationFusionLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateCombinationFusionBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '组合评分融合回测失败');
+    }
+    combinationFusionBacktest.value = res.data;
+    showMessage('组合评分融合回测完成，可查看来源分参与排序后的组合覆盖变化', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '组合评分融合回测失败', 'error');
+  } finally {
+    combinationFusionLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球组合评分融合回测区域。
+ */
+async function toggleCombinationFusionBacktest() {
+  if (combinationFusionBacktest.value) {
+    combinationFusionBacktest.value = null;
+    showMessage('已关闭组合评分融合回测', 'success');
+    return;
+  }
+  await loadCombinationFusionBacktest();
+}
+
+/**
+ * 加载红球组合评分来源权重网格。
+ * @description 对比不同sourceWeight下，保底来源分参与组合排序后的覆盖变化。
+ */
+async function loadCombinationSourceWeightGridBacktest() {
+  combinationSourceWeightGridLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getRedCandidateCombinationSourceWeightGridBacktest(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '来源权重网格回测失败');
+    }
+    combinationSourceWeightGridBacktest.value = res.data;
+    showMessage('来源权重网格回测完成，可比较不同来源权重下的组合覆盖变化', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '来源权重网格回测失败', 'error');
+  } finally {
+    combinationSourceWeightGridLoading.value = false;
+  }
+}
+
+/**
+ * 切换红球组合评分来源权重网格区域。
+ */
+async function toggleCombinationSourceWeightGridBacktest() {
+  if (combinationSourceWeightGridBacktest.value) {
+    combinationSourceWeightGridBacktest.value = null;
+    showMessage('已关闭来源权重网格回测', 'success');
+    return;
+  }
+  await loadCombinationSourceWeightGridBacktest();
+}
+
+/**
+ * 加载红球候选池保底扩展对照。
+ * @description 同时拉取顺序版和固定配额版，页面上合并为同一个诊断区进行对比。
+ */
+async function loadGuardBacktestComparison() {
   guardBacktestLoading.value = true;
   message.value = '';
   try {
-    const res = await getRedCandidateGuardBacktest(20);
-    if (res.code !== 200) {
-      throw new Error(res.msg || '保底扩展回测失败');
+    const [basicRes, quotaRes] = await Promise.all([
+      getRedCandidateGuardBacktest(20),
+      getRedCandidateGuardQuotaBacktest(20)
+    ]);
+    if (basicRes.code !== 200) {
+      throw new Error(basicRes.msg || '保底扩展回测失败');
     }
-    guardBacktest.value = res.data;
-    guardBacktestTitle.value = '红球候选池保底扩展回测';
-    showMessage('保底扩展回测完成，详细结论见下方回测区域', 'success');
+    if (quotaRes.code !== 200) {
+      throw new Error(quotaRes.msg || '保底来源配额回测失败');
+    }
+    guardBacktest.value = basicRes.data;
+    guardQuotaBacktest.value = quotaRes.data;
+    activeGuardBacktestMode.value = 'basic';
+    showMessage('保底扩展对照完成，可在下方切换顺序版和固定配额版明细', 'success');
   } catch (err: unknown) {
-    showMessage(err instanceof Error ? err.message : '保底扩展回测失败', 'error');
+    showMessage(err instanceof Error ? err.message : '保底扩展对照失败', 'error');
   } finally {
     guardBacktestLoading.value = false;
   }
 }
 
 /**
- * 切换红球候选池保底扩展回测区域
+ * 切换红球候选池保底扩展对照区域。
  */
-async function toggleGuardBacktest() {
+async function toggleGuardBacktestComparison() {
   if (isGuardBacktestOpen.value) {
     guardBacktest.value = null;
-    showMessage('已关闭保底扩展回测', 'success');
+    guardQuotaBacktest.value = null;
+    activeGuardBacktestMode.value = 'basic';
+    showMessage('已关闭保底扩展对照', 'success');
     return;
   }
-  await loadGuardBacktest();
-}
-
-/**
- * 加载红球候选池保底来源配额回测
- */
-async function loadGuardQuotaBacktest() {
-  guardBacktestLoading.value = true;
-  message.value = '';
-  try {
-    const res = await getRedCandidateGuardQuotaBacktest(20);
-    if (res.code !== 200) {
-      throw new Error(res.msg || '保底来源配额回测失败');
-    }
-    guardBacktest.value = res.data;
-    guardBacktestTitle.value = '红球候选池保底来源配额回测';
-    showMessage('保底来源配额回测完成，详细结论见下方回测区域', 'success');
-  } catch (err: unknown) {
-    showMessage(err instanceof Error ? err.message : '保底来源配额回测失败', 'error');
-  } finally {
-    guardBacktestLoading.value = false;
-  }
-}
-
-/**
- * 切换红球候选池保底来源配额回测区域
- */
-async function toggleGuardQuotaBacktest() {
-  if (isGuardQuotaBacktestOpen.value) {
-    guardBacktest.value = null;
-    showMessage('已关闭配额保底回测', 'success');
-    return;
-  }
-  await loadGuardQuotaBacktest();
+  await loadGuardBacktestComparison();
 }
 
 /**
@@ -3150,11 +4888,19 @@ function loadSnapshotToPage(snapshot: PredictionSnapshotEntity) {
   reviewTrend.value = null;
   redMissDistribution.value = null;
   guardBacktest.value = null;
+  guardQuotaBacktest.value = null;
   guardQuotaGridBacktest.value = null;
   guardCompressionBacktest.value = null;
   guardCompressionGridBacktest.value = null;
   guardCompressionRetentionGridBacktest.value = null;
+  entryFusionBacktest.value = null;
+  entryRescoreFusionBacktest.value = null;
+  entryFusionGridBacktest.value = null;
+  combinationFusionBacktest.value = null;
+  combinationSourceWeightGridBacktest.value = null;
+  redFunnelDiagnosis.value = null;
   bayesDiagnosis.value = null;
+  blueCandidateDiagnosis.value = null;
   viewMode.value = 'snapshot';
   showMessage(`已切换到历史快照：ID ${snapshot.id}，预测期号 ${snapshot.predictQiHao}`, 'success');
 }
@@ -3170,11 +4916,19 @@ async function returnRealtimePrediction() {
   reviewTrend.value = null;
   redMissDistribution.value = null;
   guardBacktest.value = null;
+  guardQuotaBacktest.value = null;
   guardQuotaGridBacktest.value = null;
   guardCompressionBacktest.value = null;
   guardCompressionGridBacktest.value = null;
   guardCompressionRetentionGridBacktest.value = null;
+  entryFusionBacktest.value = null;
+  entryRescoreFusionBacktest.value = null;
+  entryFusionGridBacktest.value = null;
+  combinationFusionBacktest.value = null;
+  combinationSourceWeightGridBacktest.value = null;
+  redFunnelDiagnosis.value = null;
   bayesDiagnosis.value = null;
+  blueCandidateDiagnosis.value = null;
   viewMode.value = 'realtime';
   await loadPredictionInternal(false);
 }
@@ -3320,10 +5074,19 @@ async function saveSnapshot() {
     reviewResult.value = null;
     redMissDiagnosis.value = null;
     guardBacktest.value = null;
+    guardQuotaBacktest.value = null;
     guardQuotaGridBacktest.value = null;
     guardCompressionBacktest.value = null;
     guardCompressionGridBacktest.value = null;
     guardCompressionRetentionGridBacktest.value = null;
+    entryFusionBacktest.value = null;
+    entryRescoreFusionBacktest.value = null;
+    entryFusionGridBacktest.value = null;
+    combinationFusionBacktest.value = null;
+    combinationSourceWeightGridBacktest.value = null;
+    redFunnelDiagnosis.value = null;
+    bayesDiagnosis.value = null;
+    blueCandidateDiagnosis.value = null;
     showMessage(`快照保存成功：ID ${res.data.id}，预测期号 ${res.data.predictQiHao}`, 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '保存预测快照失败', 'error');
@@ -3434,6 +5197,65 @@ onMounted(async () => {
   background: rgba(34, 197, 94, 0.28);
 }
 
+.guard-compare-panel {
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.guard-mode-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.guard-mode-tab {
+  min-height: 26px;
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.guard-mode-tab-active {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.comparison-row-active {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.diagnostic-result-section.diagnostic-section-collapsed > :not(.diagnostic-section-header) {
+  display: none;
+}
+
+.diagnostic-section-header {
+  align-items: flex-start;
+}
+
+.collapse-button {
+  flex-shrink: 0;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background 0.2s, color 0.2s;
+}
+
+.collapse-button:hover {
+  background: rgba(96, 165, 250, 0.24);
+  color: #bfdbfe;
+}
+
 .action-link {
   text-decoration: none;
 }
@@ -3468,6 +5290,272 @@ onMounted(async () => {
   border: 1px solid rgba(96, 165, 250, 0.35);
   background: rgba(96, 165, 250, 0.08);
   color: var(--color-text-secondary);
+}
+
+.workflow-panel {
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.workflow-step,
+.diagnostic-guide-item {
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(22, 33, 62, 0.42);
+}
+
+.workflow-step {
+  min-height: 104px;
+}
+
+.workflow-step-title,
+.diagnostic-guide-title {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.workflow-step-status {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workflow-step-desc,
+.diagnostic-guide-desc {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.workflow-step-done {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.workflow-step-done .workflow-step-status {
+  color: #4ade80;
+}
+
+.workflow-step-pending {
+  border-color: rgba(250, 204, 21, 0.38);
+}
+
+.workflow-step-pending .workflow-step-status {
+  color: #facc15;
+}
+
+.workflow-step-waiting,
+.workflow-step-unknown {
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.workflow-step-waiting .workflow-step-status,
+.workflow-step-unknown .workflow-step-status {
+  color: var(--color-text-secondary);
+}
+
+.diagnostic-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.diagnostic-guide-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.diagnostic-guide-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(236, 72, 153, 0.14);
+  color: #f472b6;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.metric-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.metric-guide-item {
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(22, 33, 62, 0.42);
+}
+
+.metric-guide-title {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.metric-guide-formula {
+  margin-top: 6px;
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric-guide-desc,
+.metric-guide-watch {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.metric-guide-watch {
+  border-top: 1px solid rgba(96, 165, 250, 0.14);
+  padding-top: 6px;
+  color: #facc15;
+}
+
+.strategy-admission-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.strategy-admission-badge-pass {
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+}
+
+.strategy-admission-badge-observe {
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+}
+
+.strategy-admission-badge-fail {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
+}
+
+.strategy-admission-badge-unknown {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--color-text-secondary);
+}
+
+.strategy-admission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.strategy-admission-item {
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(22, 33, 62, 0.42);
+}
+
+.strategy-admission-pass {
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
+.strategy-admission-observe {
+  border-color: rgba(250, 204, 21, 0.32);
+}
+
+.strategy-admission-fail {
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+.strategy-admission-title {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.strategy-admission-status {
+  margin-top: 6px;
+  color: #facc15;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.strategy-admission-pass .strategy-admission-status {
+  color: #4ade80;
+}
+
+.strategy-admission-fail .strategy-admission-status {
+  color: #f87171;
+}
+
+.strategy-admission-unknown .strategy-admission-status {
+  color: var(--color-text-secondary);
+}
+
+.strategy-admission-desc {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.funnel-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.funnel-flow-card {
+  position: relative;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 6px;
+  padding: 12px;
+  background: rgba(22, 33, 62, 0.42);
+}
+
+.funnel-flow-card::after {
+  content: '→';
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  transform: translateY(-50%);
+  color: rgba(147, 197, 253, 0.8);
+  font-weight: 800;
+}
+
+.funnel-flow-card:last-child::after {
+  content: '';
+}
+
+.funnel-flow-title {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.funnel-flow-value {
+  margin-top: 8px;
+  color: #bfdbfe;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.funnel-flow-meta {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .diagnosis-collapse {
@@ -3597,6 +5685,12 @@ onMounted(async () => {
   max-width: 420px;
   white-space: normal;
   line-height: 1.6;
+}
+
+.diagnostic-subtotal-row td {
+  background: rgba(96, 165, 250, 0.08);
+  color: #bfdbfe;
+  font-weight: 700;
 }
 
 .empty-text {
