@@ -205,109 +205,22 @@
       </div>
     </section>
 
-    <!-- 开奖上下文信息：用于判断预测是否已经落后于最新开奖 -->
-    <section class="bg-bg-card rounded-lg p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-base font-bold text-text-primary">开奖信息</h2>
-          <p class="mt-1 text-xs text-text-secondary">
-            如果最新开奖期号和当前预测期号相同，通常表示窗口、坐标或结构族数据还没同步到下一期。
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            :disabled="drawLoading"
-            class="action-button"
-            @click="refreshDrawContext"
-          >
-            {{ drawLoading ? '同步中...' : '同步开奖/窗口' }}
-          </button>
-          <button
-            :disabled="axisSyncLoading"
-            class="action-button"
-            @click="syncAxisChains"
-          >
-            {{ axisSyncLoading ? '同步中...' : '同步坐标结构链' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div class="summary-block">
-          <div class="summary-label">最新开奖</div>
-          <div class="summary-value">
-            {{ latestDraw?.qiHao ? `第${latestDraw.qiHao}期` : '--' }}
-            <span class="text-text-secondary">{{ latestDraw?.dateAndWeek || '' }}</span>
-          </div>
-        </div>
-        <div class="summary-block">
-          <div class="summary-label">开奖号</div>
-          <div class="summary-value">
-            {{ latestDraw ? `${drawRedText(latestDraw)} + ${latestDraw.blue}` : '--' }}
-          </div>
-        </div>
-        <div class="summary-block">
-          <div class="summary-label">当前预测期号</div>
-          <div class="summary-value text-accent">
-            {{ currentPredictQiHao || '--' }}
-          </div>
-        </div>
-        <div class="summary-block">
-          <div class="summary-label">复盘状态</div>
-          <div
-            :class="[
-              'summary-value',
-              selectedSnapshotCanReview ? 'text-green-400' : 'text-yellow-400'
-            ]"
-          >
-            {{ reviewAvailabilityText }}
-          </div>
-        </div>
-      </div>
-
-      <div v-if="predictionNeedsWindowSync" class="mt-3 warning-box">
-        当前预测期号已经追平最新开奖期号。请先同步开奖/窗口，再同步坐标结构链；
-        完成后点击“刷新预测”，再生成下一期快照。
-      </div>
-      <div v-if="axisSyncResults.length > 0" class="mt-3 info-box">
-        <div class="font-bold text-text-primary">最近一次坐标结构链同步结果</div>
-        <div class="mt-1">红10专用增量链已执行；下方为通用多窗口重建结果。</div>
-        <div class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-          <div
-            v-for="item in axisSyncResults"
-            :key="item.windowCode"
-            class="sync-result-item"
-          >
-            <div class="font-bold text-text-primary">{{ item.windowName }}</div>
-            <div>坐标{{ item.axisCount }} / 模板{{ item.templateCount }} / 结构族{{ item.groupCount }}</div>
-            <div>模板迁移{{ item.templateTargetCount }} / 结构族迁移{{ item.groupTargetCount }}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-3 workflow-panel">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div class="font-bold text-text-primary">开奖后执行链</div>
-            <p class="mt-1 text-xs text-text-secondary">
-              用于检查复盘证据链是否闭合；这里只提示状态，不会自动改写预测或诊断数据。
-            </p>
-          </div>
-          <span class="text-xs text-text-secondary">{{ workflowSummaryText }}</span>
-        </div>
-        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2">
-          <div
-            v-for="step in postDrawWorkflowSteps"
-            :key="step.key"
-            :class="['workflow-step', `workflow-step-${step.status}`]"
-          >
-            <div class="workflow-step-title">{{ step.title }}</div>
-            <div class="workflow-step-status">{{ step.statusText }}</div>
-            <div class="workflow-step-desc">{{ step.description }}</div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <DrawContextPanel
+      :latest-qi-hao="latestDraw?.qiHao"
+      :latest-date-and-week="latestDraw?.dateAndWeek"
+      :latest-ticket-text="latestDraw ? `${drawRedText(latestDraw)} + ${latestDraw.blue}` : '--'"
+      :current-predict-qi-hao="currentPredictQiHao || '--'"
+      :review-availability-text="reviewAvailabilityText"
+      :selected-snapshot-can-review="selectedSnapshotCanReview"
+      :prediction-needs-window-sync="predictionNeedsWindowSync"
+      :axis-sync-results="axisSyncResults"
+      :workflow-summary-text="workflowSummaryText"
+      :workflow-steps="postDrawWorkflowSteps"
+      :draw-loading="drawLoading"
+      :axis-sync-loading="axisSyncLoading"
+      @refresh-draw-context="refreshDrawContext"
+      @sync-axis-chains="syncAxisChains"
+    />
 
     <section v-if="isDiagnosticPage" class="bg-bg-card rounded-lg p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -395,67 +308,18 @@
       </div>
     </section>
 
-    <!-- 最近预测快照列表 -->
-    <section v-if="isReviewPage" class="bg-bg-card rounded-lg p-4">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-bold text-text-primary">最近预测快照</h2>
-        <span class="text-xs text-text-secondary">点击快照可切换到历史快照模式</span>
-      </div>
-      <div v-if="snapshots.length > 0" class="mt-3 overflow-auto">
-        <table class="result-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>预测期号</th>
-              <th>保存时间</th>
-              <th>推荐票面</th>
-              <th>模型版本</th>
-              <th>复盘</th>
-              <th>可复盘</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in snapshots" :key="item.id">
-              <td>{{ item.id }}</td>
-              <td>{{ item.predictQiHao }}</td>
-              <td>{{ item.createTime }}</td>
-              <td class="font-bold text-text-primary">
-                <TicketTextByText
-                  v-if="item.finalRecommendedTicketText"
-                  :ticket-text="item.finalRecommendedTicketText"
-                  :actual-ticket-text="snapshotActualTicketText(item)"
-                />
-                <span v-else>--</span>
-              </td>
-              <td>{{ item.modelVersion }}</td>
-              <td>
-                <span :class="snapshotReviewBadgeClass(item)">
-                  {{ snapshotReviewText(item) }}
-                </span>
-              </td>
-              <td>
-                <span :class="snapshotDrawBadgeClass(item)">
-                  {{ snapshotDrawText(item) }}
-                </span>
-              </td>
-              <td>
-                <div class="flex gap-2">
-                  <button
-                    class="px-2 py-1 rounded bg-bg-secondary text-text-primary hover:bg-accent"
-                    :disabled="reviewingSnapshotId === item.id"
-                    @click="handleSnapshotAction(item)"
-                  >
-                    {{ reviewingSnapshotId === item.id ? '处理中' : snapshotActionText(item) }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-else class="empty-text">暂无已读取的快照，点击“读取快照”查看最近记录。</div>
-    </section>
+    <SnapshotListPanel
+      v-if="isReviewPage"
+      :snapshots="snapshots"
+      :reviewing-snapshot-id="reviewingSnapshotId"
+      :actual-ticket-text="snapshotActualTicketText"
+      :review-text="snapshotReviewText"
+      :review-badge-class="snapshotReviewBadgeClass"
+      :draw-text="snapshotDrawText"
+      :draw-badge-class="snapshotDrawBadgeClass"
+      :action-text="snapshotActionText"
+      @select-snapshot="handleSnapshotAction"
+    />
 
     <!-- 红球贝叶斯冷热诊断：单号动态修正观察，不直接改变正式预测 -->
     <section v-if="isDiagnosticPage && bayesDiagnosis" :class="diagnosticSectionClass('bayes')">
@@ -2797,8 +2661,13 @@
  * 模型预测/诊断结果台
  * 第一阶段先接入最终预测和10注6+1单式方案，后续继续扩展回测、诊断和复盘
  */
-import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import DrawContextPanel from '@/components/lottery/model/DrawContextPanel.vue';
+import HitNumberList from '@/components/lottery/model/HitNumberList.vue';
+import SnapshotListPanel from '@/components/lottery/model/SnapshotListPanel.vue';
+import TicketNumberText from '@/components/lottery/model/TicketNumberText.vue';
+import TicketTextByText from '@/components/lottery/model/TicketTextByText.vue';
 import { useLotteryStore } from '@/stores/lottery';
 import type { DrawRecord } from '@/types';
 import {
@@ -3161,174 +3030,6 @@ const canSaveDiagnosticSnapshot = computed(() => {
  * v2开始红球6数组合形态分加入AC值，因此同预测期号的新快照需要和v1区分。
  */
 const SNAPSHOT_MODEL_VERSION = 'front-v3-snapshot-v2-ac-shape';
-
-/**
- * 单色号码列表渲染组件
- * @description 用于红球观察池、胆候选、蓝球候选榜等非完整票面的号码标色。
- */
-const HitNumberList = defineComponent({
-  name: 'HitNumberList',
-  props: {
-    numbers: {
-      type: Array as PropType<string[]>,
-      required: true
-    },
-    kind: {
-      type: String as PropType<'red' | 'blue'>,
-      required: true
-    },
-    actualRedNumbers: {
-      type: Array as PropType<string[] | undefined>,
-      default: undefined
-    },
-    actualBlueNumber: {
-      type: String as PropType<string | undefined>,
-      default: undefined
-    }
-  },
-  setup(props) {
-    return () => {
-      if (!props.numbers.length) {
-        return h('span', '--');
-      }
-
-      const actualRedSet = new Set(props.actualRedNumbers ?? []);
-      const nodes = props.numbers.flatMap((number, index) => {
-        const hitClass = props.kind === 'red'
-          ? (actualRedSet.has(number) ? 'ticket-hit-red' : '')
-          : (props.actualBlueNumber && number === props.actualBlueNumber ? 'ticket-hit-blue' : '');
-
-        return [
-          h('span', {
-            class: [
-              'ticket-number',
-              props.kind === 'red' ? 'ticket-red-number' : 'ticket-blue-number',
-              hitClass
-            ]
-          }, number),
-          index < props.numbers.length - 1 ? h('span', { class: 'ticket-separator' }, ',') : null
-        ];
-      }).filter(Boolean);
-
-      return h('span', { class: 'ticket-number-text' }, nodes);
-    };
-  }
-});
-
-/**
- * 票面号码渲染组件
- * @description 开奖后直接在原票面上标色：命中红球显示红色，命中蓝球显示蓝色。
- */
-const TicketNumberText = defineComponent({
-  name: 'TicketNumberText',
-  props: {
-    redNumbers: {
-      type: Array as PropType<string[]>,
-      required: true
-    },
-    blueNumber: {
-      type: String,
-      required: true
-    },
-    actualRedNumbers: {
-      type: Array as PropType<string[] | undefined>,
-      default: undefined
-    },
-    actualBlueNumber: {
-      type: String as PropType<string | undefined>,
-      default: undefined
-    }
-  },
-  setup(props) {
-    return () => {
-      const actualRedSet = new Set(props.actualRedNumbers ?? []);
-      const redNodes = props.redNumbers.flatMap((number, index) => [
-        h('span', {
-          class: [
-            'ticket-number',
-            'ticket-red-number',
-            actualRedSet.has(number) ? 'ticket-hit-red' : ''
-          ]
-        }, number),
-        index < props.redNumbers.length - 1 ? h('span', { class: 'ticket-separator' }, ',') : null
-      ]).filter(Boolean);
-      const blueHit = Boolean(props.actualBlueNumber && props.blueNumber === props.actualBlueNumber);
-
-      return h('span', { class: 'ticket-number-text' }, [
-        ...redNodes,
-        h('span', { class: 'ticket-plus' }, ' + '),
-        h('span', {
-          class: [
-            'ticket-number',
-            'ticket-blue-number',
-            blueHit ? 'ticket-hit-blue' : ''
-          ]
-        }, props.blueNumber || '--')
-      ]);
-    };
-  }
-});
-
-/**
- * 从票面文本中解析红球和蓝球。
- * @description 多期复盘趋势里后端给的是完整票面文本，这里统一拆成红球数组和蓝球，方便复用命中标色组件。
- * @param ticketText 形如“01,02,03,04,05,06 + 07”的票面文本
- * @returns 解析后的红球数组和蓝球
- */
-function parseTicketText(ticketText?: string | null) {
-  // 空文本返回空票面，调用处会展示原始占位。
-  if (!ticketText) {
-    return { redNumbers: [] as string[], blueNumber: '' };
-  }
-
-  // 按加号拆分红球区和蓝球区，同时兼容中文全角加号。
-  const [redPart = '', bluePart = ''] = ticketText.split(/[+＋]/);
-  // 只提取两位数字，避免逗号、空格和中文说明影响解析。
-  const redNumbers = (redPart.match(/\d{2}/g) ?? []).slice(0, 6);
-  // 蓝球优先取加号右侧；如果没有加号，则退回整段文本中的第七个两位数。
-  const blueNumber = (bluePart.match(/\d{2}/g) ?? [])[0]
-    ?? (ticketText.match(/\d{2}/g) ?? [])[6]
-    ?? '';
-
-  return { redNumbers, blueNumber };
-}
-
-/**
- * 文本票面命中渲染组件。
- * @description 用于复盘趋势等只拿到票面文本的表格列，将命中的红球渲染为红色、命中的蓝球渲染为蓝色。
- */
-const TicketTextByText = defineComponent({
-  name: 'TicketTextByText',
-  props: {
-    ticketText: {
-      type: String,
-      required: true
-    },
-    actualTicketText: {
-      type: String,
-      required: true
-    }
-  },
-  setup(props) {
-    return () => {
-      // 解析预测票面和实际开奖票面。
-      const ticket = parseTicketText(props.ticketText);
-      const actualTicket = parseTicketText(props.actualTicketText);
-
-      // 无法解析时保留原始文本，避免因为异常格式导致页面空白。
-      if (ticket.redNumbers.length === 0) {
-        return h('span', props.ticketText || '--');
-      }
-
-      return h(TicketNumberText, {
-        redNumbers: ticket.redNumbers,
-        blueNumber: ticket.blueNumber,
-        actualRedNumbers: actualTicket.redNumbers,
-        actualBlueNumber: actualTicket.blueNumber
-      });
-    };
-  }
-});
 
 /**
  * 最新开奖数据

@@ -90,6 +90,12 @@
 - `DiagnosisMetricCard.vue`：展示随机基线、模型命中率、lift 等诊断指标。
 - `PeriodReviewPanel.vue`：展示某一期预测和实际开奖的复盘。
 
+已开始落地的组件：
+
+- `DrawContextPanel.vue`：承载开奖信息、同步按钮和开奖后执行链。
+- `SnapshotListPanel.vue`：承载快照复盘台的最近快照列表。
+- `HitNumberList.vue`、`TicketNumberText.vue`、`TicketTextByText.vue`：统一红蓝命中标色和文本票面解析。
+
 建议新增状态模块：
 
 - `stores/modelPrediction.ts`：预测结果、候选池、票面方案。

@@ -24,7 +24,8 @@ yybf-front-v3/
 │   │       ├── LatestDrawInfo.vue  # 最新开奖信息组件
 │   │       ├── WindowLevelPanel.vue # 窗口等级面板组件
 │   │       ├── WindowLevelTable.vue  # 窗口等级表格组件
-│   │       └── WindowStatusModal.vue # 窗口状态弹窗组件
+│   │       ├── WindowStatusModal.vue # 窗口状态弹窗组件
+│   │       └── model/                # 模型预测、快照复盘、诊断展示组件
 │   │
 │   ├── composables/            # 组合式函数
 │   │   └── useDatabase.ts      # IndexedDB 数据库封装（Dexie.js）
@@ -81,6 +82,11 @@ yybf-front-v3/
 | `src/views/Home.vue` | 首页占位组件，默认入口由路由重定向处理 |
 | `src/views/WindowConsole.vue` | 基础窗口操作台页面，承载开奖、窗口矩阵、模拟选择、窗口同步 |
 | `src/views/ModelDashboard.vue` | 预测/复盘/诊断复用页面组件，通过路由模式分别承载实时预测台、快照复盘台和诊断研究台 |
+| `src/components/lottery/model/DrawContextPanel.vue` | 开奖信息、窗口/结构链同步按钮和开奖后执行链展示 |
+| `src/components/lottery/model/SnapshotListPanel.vue` | 快照复盘台最近快照列表展示 |
+| `src/components/lottery/model/HitNumberList.vue` | 红球/蓝球候选列表命中标色 |
+| `src/components/lottery/model/TicketNumberText.vue` | 完整票面红蓝命中标色 |
+| `src/components/lottery/model/TicketTextByText.vue` | 文本票面解析和命中标色 |
 | `src/api/modules/modelPrediction.ts` | 模型预测接口封装 |
 | `docs/frontend-module-plan.md` | 基础窗口操作台与模型预测/诊断结果台的拆分规划 |
 | `docs/frontend-development-workflow.md` | 前端开发流程、页面职责和进度记录 |
