@@ -417,6 +417,15 @@ export interface PredictionDiagnosticSnapshotEntity {
 }
 
 /**
+ * 预测诊断快照查询条件
+ */
+export interface PredictionDiagnosticSnapshotQuery {
+  predictQiHao?: string;             // 预测期号
+  snapshotId?: number;               // 关联的预测快照ID
+  diagnosticType?: string;           // 诊断类型
+}
+
+/**
  * 红球漏号诊断中的单窗口状态
  */
 export interface RedCandidateMissWindowState {
@@ -1086,6 +1095,19 @@ export async function savePredictionDiagnosticReviewPack(
     },
     // 诊断包会串行保存多期趋势、阶段漏斗、入口网格、压缩网格等重型回测，耗时明显长于普通接口。
     timeout: 180000
+  });
+}
+
+/**
+ * 查询已保存的预测诊断快照
+ * @param params 查询条件
+ * @returns 已保存的诊断快照记录
+ */
+export async function getPredictionDiagnosticSnapshots(
+  params: PredictionDiagnosticSnapshotQuery
+): Promise<ApiResponse<PredictionDiagnosticSnapshotEntity[]>> {
+  return request.get('/ssq/window/axis/prediction/diagnostic-snapshot/list', {
+    params
   });
 }
 

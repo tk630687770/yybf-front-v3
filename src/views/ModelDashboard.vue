@@ -2822,6 +2822,7 @@ import {
   getLatestPredictionSnapshots,
   getMultiWindowFinalPredict,
   getNinePlusOnePredict,
+  getPredictionDiagnosticSnapshots,
   getPredictionSnapshotsByQiHao,
   getSingleTicketPlanPredict,
   reviewPredictionSnapshot,
@@ -2831,6 +2832,7 @@ import {
   syncRed10AxisChain,
   type BlueCandidateDiagnosisResult,
   type MultiWindowFinalPredictResult,
+  type PredictionDiagnosticSnapshotEntity,
   type PredictionSnapshotEntity,
   type PredictionSnapshotReviewResult,
   type PredictionSnapshotTicketReview,
@@ -2909,6 +2911,7 @@ const bayesDiagnosis = ref<RedBayesDiagnosisResult | null>(null);
 const blueCandidateDiagnosis = ref<BlueCandidateDiagnosisResult | null>(null);
 const axisSyncResults = ref<WindowAxisChainResult[]>([]);
 const snapshots = ref<PredictionSnapshotEntity[]>([]);
+const activeDiagnosticSnapshots = ref<PredictionDiagnosticSnapshotEntity[]>([]);
 const viewMode = ref<'realtime' | 'snapshot'>('realtime');
 const emptySourceContributionStats: RedCandidateGuardSourceContribution[] = [];
 const collapsedDiagnosticSections = ref<Set<string>>(new Set());
@@ -3371,6 +3374,9 @@ const reviewAvailabilityText = computed(() => {
  * 当前预测是否可能还停留在已开奖期号
  */
 const predictionNeedsWindowSync = computed(() => {
+  if (workflowHasNextSnapshotEvidence.value) {
+    return false;
+  }
   return Boolean(
     latestDraw.value?.qiHao
     && currentPredictQiHao.value
@@ -3387,11 +3393,17 @@ const activeSnapshotReviewed = computed(() => {
 });
 
 /**
- * 当前快照是否已经在本次页面会话中保存过诊断包。
- * @description 诊断包保存结果暂不反查数据库，只对当前会话给出明确完成提示，避免误判历史状态。
+ * 当前快照是否已经保存过诊断包。
+ * @description 优先读取后端已保存诊断记录，同时兼容本页刚保存但列表尚未刷新完成的状态。
  */
 const activeDiagnosticPackSaved = computed(() => {
-  return Boolean(activeSnapshot.value?.id && diagnosticPackSavedSnapshotId.value === activeSnapshot.value.id);
+  return Boolean(
+    activeSnapshot.value?.id
+    && (
+      diagnosticPackSavedSnapshotId.value === activeSnapshot.value.id
+      || activeDiagnosticSnapshots.value.some(item => item.snapshotId === activeSnapshot.value?.id)
+    )
+  );
 });
 
 /**
@@ -3405,6 +3417,29 @@ const currentPredictionIsNextPeriod = computed(() => {
 });
 
 /**
+ * 已保存的下一期预测快照。
+ * @description 历史复盘模式下不能只看当前展示的快照期号，需要从快照列表判断是否已经完成下一期保存。
+ */
+const nextSavedSnapshotAfterLatestDraw = computed(() => {
+  const latestQiHao = latestDraw.value?.qiHao;
+  if (!latestQiHao) {
+    return null;
+  }
+
+  return snapshots.value
+    .filter(item => Number(item.predictQiHao) > Number(latestQiHao))
+    .sort((left, right) => Number(left.predictQiHao) - Number(right.predictQiHao))[0] ?? null;
+});
+
+/**
+ * 是否存在开奖后流程已推进到下一期的证据。
+ * @description 下一期快照已保存时，说明窗口基础和结构链至少已经支持生成下一期预测。
+ */
+const workflowHasNextSnapshotEvidence = computed(() => {
+  return Boolean(nextSavedSnapshotAfterLatestDraw.value || currentPredictionIsNextPeriod.value);
+});
+
+/**
  * 当前页面的开奖后执行链状态。
  * @description 用于提醒人工操作顺序，不触发接口，也不修改任何预测结果。
  */
@@ -3412,11 +3447,8 @@ const postDrawWorkflowSteps = computed<WorkflowStep[]>(() => {
   const hasDraw = Boolean(latestDraw.value?.qiHao);
   const hasSnapshot = Boolean(activeSnapshot.value);
   const hasActualForSnapshot = Boolean(activeSnapshot.value && hasActualDraw(activeSnapshot.value.predictQiHao));
-  const hasNextSnapshot = Boolean(
-    latestSnapshot.value?.predictQiHao
-    && latestDraw.value?.qiHao
-    && Number(latestSnapshot.value.predictQiHao) > Number(latestDraw.value.qiHao)
-  );
+  const nextSnapshot = nextSavedSnapshotAfterLatestDraw.value;
+  const axisSynced = axisSyncResults.value.length > 0 || Boolean(nextSnapshot);
 
   return [
     {
@@ -3430,8 +3462,10 @@ const postDrawWorkflowSteps = computed<WorkflowStep[]>(() => {
       key: 'window',
       title: '窗口基础',
       status: predictionNeedsWindowSync.value ? 'pending' : (hasDraw ? 'done' : 'waiting'),
-      statusText: predictionNeedsWindowSync.value ? '待推进' : (hasDraw ? '已就绪' : '等待开奖'),
-      description: predictionNeedsWindowSync.value ? '预测期号仍追平开奖期号。' : '窗口期号未显示明显滞后。'
+      statusText: predictionNeedsWindowSync.value ? '待推进' : (hasDraw ? '已推进' : '等待开奖'),
+      description: predictionNeedsWindowSync.value
+        ? '当前预测期号仍追平开奖期号。'
+        : (nextSnapshot ? `已存在下一期快照 ${nextSnapshot.predictQiHao}。` : '窗口期号未显示明显滞后。')
     },
     {
       key: 'review',
@@ -3444,22 +3478,26 @@ const postDrawWorkflowSteps = computed<WorkflowStep[]>(() => {
       key: 'diagnosticPack',
       title: '诊断包',
       status: activeDiagnosticPackSaved.value ? 'done' : (activeSnapshotReviewed.value ? 'pending' : 'waiting'),
-      statusText: activeDiagnosticPackSaved.value ? '本次已保存' : (activeSnapshotReviewed.value ? '建议保存' : '等待复盘'),
-      description: activeDiagnosticPackSaved.value ? '已沉淀本页诊断证据。' : '保存后便于后续跨期比较。'
+      statusText: activeDiagnosticPackSaved.value ? '已保存' : (activeSnapshotReviewed.value ? '建议保存' : '等待复盘'),
+      description: activeDiagnosticPackSaved.value
+        ? `已保存 ${activeDiagnosticSnapshots.value.length || 1} 条诊断证据。`
+        : '保存后便于后续跨期比较。'
     },
     {
       key: 'axis',
       title: '结构链',
-      status: axisSyncResults.value.length > 0 ? 'done' : (activeSnapshotReviewed.value ? 'pending' : 'waiting'),
-      statusText: axisSyncResults.value.length > 0 ? '已同步' : (activeSnapshotReviewed.value ? '待同步' : '等待复盘'),
-      description: axisSyncResults.value.length > 0 ? '结构链已面向下一期刷新。' : '通常放在复盘分析后执行。'
+      status: axisSynced ? 'done' : (activeSnapshotReviewed.value ? 'pending' : 'waiting'),
+      statusText: axisSynced ? '已同步' : (activeSnapshotReviewed.value ? '待同步' : '等待复盘'),
+      description: axisSynced
+        ? (nextSnapshot ? `下一期快照 ${nextSnapshot.predictQiHao} 已生成，可视为结构链已推进。` : '结构链已面向下一期刷新。')
+        : '通常放在复盘分析后执行。'
     },
     {
       key: 'nextSnapshot',
       title: '下一期快照',
-      status: hasNextSnapshot ? 'done' : (currentPredictionIsNextPeriod.value ? 'pending' : 'waiting'),
-      statusText: hasNextSnapshot ? '已保存' : (currentPredictionIsNextPeriod.value ? '待保存' : '等待刷新'),
-      description: hasNextSnapshot ? `快照 ${latestSnapshot.value?.predictQiHao}` : '刷新下一期预测后保存。'
+      status: nextSnapshot ? 'done' : (currentPredictionIsNextPeriod.value ? 'pending' : 'waiting'),
+      statusText: nextSnapshot ? '已保存' : (currentPredictionIsNextPeriod.value ? '待保存' : '等待刷新'),
+      description: nextSnapshot ? `快照 ${nextSnapshot.predictQiHao}` : '刷新下一期预测后保存。'
     }
   ];
 });
@@ -4273,11 +4311,35 @@ async function saveDiagnosticReviewPack() {
 
     const typeText = (res.data ?? []).map(item => item.diagnosticType).join('、');
     diagnosticPackSavedSnapshotId.value = activeSnapshot.value.id;
+    activeDiagnosticSnapshots.value = res.data ?? activeDiagnosticSnapshots.value;
     showMessage(`诊断包保存成功：${typeText || '复盘趋势、漏号分布、保底扩展、贝叶斯冷热'}`, 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '保存诊断包失败，请确认后端已重启到最新代码', 'error');
   } finally {
     diagnosticSnapshotLoading.value = false;
+  }
+}
+
+/**
+ * 刷新当前快照的已保存诊断记录
+ * @description 用后端持久化记录修正“诊断包已保存”状态，避免页面刷新或切换快照后误判。
+ * @param snapshotId 预测快照ID
+ */
+async function refreshActiveDiagnosticSnapshots(snapshotId?: number | null) {
+  if (!snapshotId) {
+    activeDiagnosticSnapshots.value = [];
+    return;
+  }
+
+  try {
+    const res = await getPredictionDiagnosticSnapshots({ snapshotId });
+    if (res.code !== 200) {
+      throw new Error(res.msg || '读取诊断包保存状态失败');
+    }
+    activeDiagnosticSnapshots.value = res.data ?? [];
+  } catch {
+    // 诊断包状态只用于页面提示；查询失败时不阻断快照展示和复盘。
+    activeDiagnosticSnapshots.value = [];
   }
 }
 
@@ -4336,6 +4398,7 @@ async function loadPredictionInternal(useExistingSnapshot: boolean) {
     redFunnelDiagnosis.value = null;
     bayesDiagnosis.value = null;
     blueCandidateDiagnosis.value = null;
+    activeDiagnosticSnapshots.value = [];
     viewMode.value = 'realtime';
 
     if (useExistingSnapshot) {
@@ -4820,6 +4883,9 @@ async function loadLatestSnapshots(showTip = true) {
       throw new Error(res.msg || '读取预测快照失败');
     }
     snapshots.value = res.data;
+    if (activeSnapshot.value?.id) {
+      void refreshActiveDiagnosticSnapshots(activeSnapshot.value.id);
+    }
     if (showTip) {
       showMessage(`已读取${res.data.length}条预测快照`, 'success');
     }
@@ -4902,6 +4968,7 @@ function loadSnapshotToPage(snapshot: PredictionSnapshotEntity) {
   bayesDiagnosis.value = null;
   blueCandidateDiagnosis.value = null;
   viewMode.value = 'snapshot';
+  void refreshActiveDiagnosticSnapshots(snapshot.id);
   showMessage(`已切换到历史快照：ID ${snapshot.id}，预测期号 ${snapshot.predictQiHao}`, 'success');
 }
 
@@ -4929,6 +4996,7 @@ async function returnRealtimePrediction() {
   redFunnelDiagnosis.value = null;
   bayesDiagnosis.value = null;
   blueCandidateDiagnosis.value = null;
+  activeDiagnosticSnapshots.value = [];
   viewMode.value = 'realtime';
   await loadPredictionInternal(false);
 }
