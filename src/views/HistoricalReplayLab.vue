@@ -69,6 +69,90 @@
       </div>
     </section>
 
+    <!-- 实验横向对比 -->
+    <section class="bg-bg-card rounded-lg p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="section-title">实验横向对比</h2>
+          <p class="section-subtitle">
+            用两个已保存实验做同范围比较，重点看观察策略是否真的优于正式基线；该区域只做阅读，不改变正式预测。
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <button class="action-button" :disabled="comparisonLoading || !canLoadComparison" @click="loadComparison">
+            {{ comparisonLoading ? '对比读取中...' : '加载对比' }}
+          </button>
+          <button class="action-button" :disabled="comparisonLoading" @click="clearComparison">
+            清空对比
+          </button>
+        </div>
+      </div>
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label class="field-block">
+          <span class="field-label">对比A实验ID</span>
+          <input v-model.number="comparisonForm.leftExperimentId" class="field-input" type="number" min="1" />
+        </label>
+        <label class="field-block">
+          <span class="field-label">对比B实验ID</span>
+          <input v-model.number="comparisonForm.rightExperimentId" class="field-input" type="number" min="1" />
+        </label>
+      </div>
+      <div v-if="comparisonResult" class="mt-4 space-y-4">
+        <div class="boundary-note">
+          当前对比：A 为 {{ comparisonResult.left.strategyCode }}（实验ID {{ comparisonResult.left.experimentId }}），
+          B 为 {{ comparisonResult.right.strategyCode }}（实验ID {{ comparisonResult.right.experimentId }}）。
+          若两者期号范围不同，只能作为粗略参考，不能作为策略升级证据。
+        </div>
+        <div class="overflow-x-auto">
+          <table class="result-table">
+            <thead>
+            <tr>
+              <th>指标</th>
+              <th>A：{{ comparisonResult.left.strategyCode }}</th>
+              <th>B：{{ comparisonResult.right.strategyCode }}</th>
+              <th>B-A差值</th>
+              <th>阅读提示</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="row in comparisonRows" :key="row.label">
+              <td>{{ row.label }}</td>
+              <td>{{ row.leftText }}</td>
+              <td>{{ row.rightText }}</td>
+              <td :class="row.deltaClass">{{ row.deltaText }}</td>
+              <td>{{ row.hint }}</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="metric-card">
+            <div class="metric-label">A范围</div>
+            <div class="metric-value comparison-small">
+              {{ comparisonResult.left.startQiHao }} ~ {{ comparisonResult.left.endQiHao }}
+            </div>
+            <div class="metric-hint">{{ comparisonResult.left.periodCount }}期 / {{ comparisonResult.left.experimentName }}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">B范围</div>
+            <div class="metric-value comparison-small">
+              {{ comparisonResult.right.startQiHao }} ~ {{ comparisonResult.right.endQiHao }}
+            </div>
+            <div class="metric-hint">{{ comparisonResult.right.periodCount }}期 / {{ comparisonResult.right.experimentName }}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">入口融合提示</div>
+            <div class="metric-value comparison-small">{{ comparisonEntrySummary }}</div>
+            <div class="metric-hint">仅观察B策略存在入口融合字段时显示。</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="mt-4 boundary-note">
+        操作方式：在下方实验列表中点击“设为A/设为B”，或直接输入两个实验ID，再点击“加载对比”。
+        建议先比较 OFFICIAL_V1 基线实验与观察策略实验。
+      </div>
+    </section>
+
     <!-- 当前结果摘要 -->
     <section v-if="activeResult" class="bg-bg-card rounded-lg p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
@@ -228,6 +312,12 @@
               <button class="table-button" :disabled="detailLoading" @click="loadDetail(item.experimentId)">
                 查看详情
               </button>
+              <button class="table-button table-button-secondary" @click="setCompareExperiment('left', item.experimentId)">
+                设为A
+              </button>
+              <button class="table-button table-button-secondary" @click="setCompareExperiment('right', item.experimentId)">
+                设为B
+              </button>
             </td>
           </tr>
           <tr v-if="!experiments.length">
@@ -280,12 +370,21 @@ const running = ref(false);
 const listLoading = ref(false);
 // 详情加载状态。
 const detailLoading = ref(false);
+// 对比详情加载状态。
+const comparisonLoading = ref(false);
 // 页面提示文本。
 const message = ref('');
 // 页面提示类型。
 const messageType = ref<'success' | 'error' | 'info'>('info');
 // 是否展示完整逐期明细。
 const showAllPeriods = ref(false);
+// 实验对比表单。
+const comparisonForm = reactive({
+  leftExperimentId: null as number | null,
+  rightExperimentId: null as number | null
+});
+// 实验对比结果。
+const comparisonResult = ref<{ left: HistoricalReplayResult; right: HistoricalReplayResult } | null>(null);
 
 /**
  * 当前结果预览明细
@@ -317,6 +416,55 @@ const messageClass = computed(() => {
   }
   // 普通提示。
   return 'text-text-secondary';
+});
+
+/**
+ * 是否可以加载实验对比
+ */
+const canLoadComparison = computed(() => {
+  // 两个实验ID都存在且不相同才允许对比。
+  return Boolean(comparisonForm.leftExperimentId && comparisonForm.rightExperimentId
+    && comparisonForm.leftExperimentId !== comparisonForm.rightExperimentId);
+});
+
+/**
+ * 对比指标行
+ */
+const comparisonRows = computed(() => {
+  // 没有对比结果时返回空数组。
+  if (!comparisonResult.value) {
+    return [];
+  }
+  // 读取左右实验。
+  const { left, right } = comparisonResult.value;
+  // 返回核心指标比较。
+  return [
+    buildComparisonRow('净收益', left.totalNet, right.totalNet, 'money', '收益越高越好，但不能只看单一收益。'),
+    buildComparisonRow('回收率', left.returnRate, right.returnRate, 'percent', '回收率用于观察整体成本回补能力。'),
+    buildComparisonRow('10注最高红均值', left.bestTicketRedAvgHit, right.bestTicketRedAvgHit, 'number', '判断出票层是否留住红球优势。'),
+    buildComparisonRow('蓝球命中率', left.blueHitRate, right.blueHitRate, 'percent', '蓝球不变时该项通常不会改善。'),
+    buildComparisonRow('至少3红比例', left.atLeast3RedRate, right.atLeast3RedRate, 'percent', '衡量10注方案是否更常达到小奖门槛。'),
+    buildComparisonRow('至少4红比例', left.atLeast4RedRate, right.atLeast4RedRate, 'percent', '用于观察是否更接近高价值命中。'),
+    buildComparisonRow('服务耗时', left.elapsedMs, right.elapsedMs, 'ms-negative', '耗时越低越好，观察策略通常会更慢。')
+  ];
+});
+
+/**
+ * 入口融合摘要
+ */
+const comparisonEntrySummary = computed(() => {
+  // 没有对比结果时兜底。
+  if (!comparisonResult.value) {
+    return '暂无对比';
+  }
+  // 优先读取右侧观察策略的融合入口命中均值。
+  const average = averageFusedEntryHit(comparisonResult.value.right);
+  // 右侧无入口字段时说明不适用。
+  if (average == null) {
+    return 'B无入口字段';
+  }
+  // 返回均值文本。
+  return `B入口均值 ${average.toFixed(2)}红`;
 });
 
 /**
@@ -363,6 +511,13 @@ async function loadExperimentList() {
     const response = await listHistoricalReplayExperiments(20);
     // 写入列表。
     experiments.value = response.data ?? [];
+    // 默认将最近两条实验填入对比框，方便进入页面后快速比较最新观察策略和基线。
+    if (!comparisonForm.leftExperimentId && experiments.value[1]) {
+      comparisonForm.leftExperimentId = experiments.value[1].experimentId;
+    }
+    if (!comparisonForm.rightExperimentId && experiments.value[0]) {
+      comparisonForm.rightExperimentId = experiments.value[0].experimentId;
+    }
   } catch (error) {
     // 展示错误信息。
     setMessage(`读取实验列表失败：${errorText(error)}`, 'error');
@@ -397,6 +552,68 @@ async function loadDetail(experimentId: number) {
     // 退出详情加载状态。
     detailLoading.value = false;
   }
+}
+
+/**
+ * 设置对比实验ID
+ * @param side 对比位置
+ * @param experimentId 实验ID
+ */
+function setCompareExperiment(side: 'left' | 'right', experimentId: number) {
+  // 设置左侧实验。
+  if (side === 'left') {
+    comparisonForm.leftExperimentId = experimentId;
+  }
+  // 设置右侧实验。
+  if (side === 'right') {
+    comparisonForm.rightExperimentId = experimentId;
+  }
+}
+
+/**
+ * 加载两个实验详情用于横向对比
+ */
+async function loadComparison() {
+  // 参数不完整时提示。
+  if (!canLoadComparison.value || !comparisonForm.leftExperimentId || !comparisonForm.rightExperimentId) {
+    setMessage('请先选择两个不同的实验ID。', 'error');
+    return;
+  }
+  // 进入对比加载状态。
+  comparisonLoading.value = true;
+  // 设置提示。
+  setMessage(`正在读取实验 ${comparisonForm.leftExperimentId} 与 ${comparisonForm.rightExperimentId} 的对比数据...`, 'info');
+  try {
+    // 并行读取两个实验详情。
+    const [leftResponse, rightResponse] = await Promise.all([
+      getHistoricalReplayDetail(comparisonForm.leftExperimentId),
+      getHistoricalReplayDetail(comparisonForm.rightExperimentId)
+    ]);
+    // 写入对比结果。
+    comparisonResult.value = {
+      left: leftResponse.data,
+      right: rightResponse.data
+    };
+    // 成功提示。
+    setMessage('实验对比已加载。', 'success');
+  } catch (error) {
+    // 展示错误信息。
+    setMessage(`读取实验对比失败：${errorText(error)}`, 'error');
+  } finally {
+    // 退出对比加载状态。
+    comparisonLoading.value = false;
+  }
+}
+
+/**
+ * 清空实验对比
+ */
+function clearComparison() {
+  // 清空对比表单。
+  comparisonForm.leftExperimentId = null;
+  comparisonForm.rightExperimentId = null;
+  // 清空对比结果。
+  comparisonResult.value = null;
 }
 
 /**
@@ -479,6 +696,122 @@ function numberText(value: number | null | undefined) {
   }
   // 保留两位。
   return value.toFixed(2);
+}
+
+/**
+ * 构建对比指标行
+ * @param label 指标名称
+ * @param left 左侧值
+ * @param right 右侧值
+ * @param type 展示类型
+ * @param hint 阅读提示
+ * @returns 对比行
+ */
+function buildComparisonRow(
+  label: string,
+  left: number | null | undefined,
+  right: number | null | undefined,
+  type: 'money' | 'percent' | 'number' | 'ms-negative',
+  hint: string
+) {
+  // 空值按0参与差值，展示仍走格式化函数。
+  const leftNumber = left ?? 0;
+  const rightNumber = right ?? 0;
+  // 计算右侧减左侧。
+  const delta = rightNumber - leftNumber;
+  // 耗时类指标越小越好，其余指标越大越好。
+  const positive = type === 'ms-negative' ? delta < 0 : delta > 0;
+  // 返回页面行对象。
+  return {
+    label,
+    leftText: comparisonValueText(left, type),
+    rightText: comparisonValueText(right, type),
+    deltaText: comparisonDeltaText(delta, type),
+    deltaClass: positive ? 'text-green-300 font-bold' : delta === 0 ? 'text-text-secondary' : 'text-ball-red font-bold',
+    hint
+  };
+}
+
+/**
+ * 格式化对比值
+ * @param value 指标值
+ * @param type 展示类型
+ * @returns 指标文本
+ */
+function comparisonValueText(value: number | null | undefined, type: 'money' | 'percent' | 'number' | 'ms-negative') {
+  // 百分比用百分比格式。
+  if (type === 'percent') {
+    return percent(value);
+  }
+  // 耗时用毫秒格式。
+  if (type === 'ms-negative') {
+    return formatMs(value);
+  }
+  // 金额直接展示整数。
+  if (type === 'money') {
+    return value == null ? '-' : String(value);
+  }
+  // 普通数字保留两位。
+  return numberText(value);
+}
+
+/**
+ * 格式化对比差值
+ * @param delta 差值
+ * @param type 展示类型
+ * @returns 差值文本
+ */
+function comparisonDeltaText(delta: number, type: 'money' | 'percent' | 'number' | 'ms-negative') {
+  // 差值前缀。
+  const sign = delta > 0 ? '+' : '';
+  // 百分比差值。
+  if (type === 'percent') {
+    return `${sign}${(delta * 100).toFixed(2)}%`;
+  }
+  // 耗时差值。
+  if (type === 'ms-negative') {
+    return `${sign}${formatSignedMs(delta)}`;
+  }
+  // 金额差值。
+  if (type === 'money') {
+    return `${sign}${delta}`;
+  }
+  // 普通数字差值。
+  return `${sign}${delta.toFixed(2)}`;
+}
+
+/**
+ * 格式化带正负号的毫秒差值
+ * @param value 毫秒差值
+ * @returns 可读耗时差值
+ */
+function formatSignedMs(value: number) {
+  // 取绝对值决定单位。
+  const absValue = Math.abs(value);
+  // 超过1秒时按秒显示。
+  if (absValue >= 1000) {
+    return `${value < 0 ? '-' : ''}${(absValue / 1000).toFixed(2)}秒`;
+  }
+  // 否则按毫秒显示。
+  return `${value < 0 ? '-' : ''}${absValue}ms`;
+}
+
+/**
+ * 计算融合入口命中均值
+ * @param result 历史回放结果
+ * @returns 融合入口命中均值
+ */
+function averageFusedEntryHit(result: HistoricalReplayResult) {
+  // 提取存在融合入口字段的逐期明细。
+  const values = result.periods
+    .map((period) => period.fusedEntryHitNumbers?.length)
+    .filter((value): value is number => value != null);
+  // 没有字段时返回空。
+  if (!values.length) {
+    return null;
+  }
+  // 求平均。
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 /**
@@ -675,5 +1008,19 @@ onMounted(() => {
   padding: 5px 8px;
   color: var(--color-text-primary);
   background: rgba(233, 69, 96, 0.8);
+}
+
+.table-button + .table-button {
+  margin-left: 6px;
+}
+
+.table-button-secondary {
+  background: rgba(22, 33, 62, 0.85);
+  border: 1px solid rgba(234, 234, 234, 0.10);
+}
+
+.comparison-small {
+  font-size: 14px;
+  line-height: 1.4;
 }
 </style>

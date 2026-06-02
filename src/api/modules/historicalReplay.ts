@@ -39,6 +39,11 @@ export interface HistoricalReplayPeriodResult {
   redHitNumbers: string[];          // 最佳票命中红球
   redMissNumbers: string[];         // 最佳票漏掉红球
   blueCandidateHitRank: number | null; // 蓝球候选命中排名
+  originalEntryPool?: string[];     // 观察策略原始入口池
+  fusedEntryPool?: string[];        // 观察策略融合入口池
+  fusedEntryAddedNumbers?: string[]; // 观察策略融合新增号码
+  originalEntryHitNumbers?: string[]; // 原始入口池命中红球
+  fusedEntryHitNumbers?: string[];  // 融合入口池命中红球
 }
 
 /**
