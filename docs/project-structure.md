@@ -12,7 +12,8 @@ yybf-front-v3/
 │   ├── api/                    # 接口层
 │   │   ├── request.ts         # Axios 封装，含拦截器和错误处理
 │   │   └── modules/            # 分模块接口
-│   │       └── lottery.ts     # 彩票相关接口
+│   │       ├── lottery.ts     # 彩票相关接口
+│   │       └── historicalReplay.ts # 历史回放实验接口
 │   │
 │   ├── assets/                 # 静态资源
 │   │   └── (默认文件)
@@ -43,9 +44,10 @@ yybf-front-v3/
 │   │   └── index.ts           # Vue Router，启用 KeepAlive
 │   │
 │   ├── views/                  # 页面组件
-│   │   ├── Home.vue           # 首页占位组件
-│   │   ├── WindowConsole.vue  # 基础窗口操作台页面
-│   │   └── ModelDashboard.vue # 预测/复盘/诊断复用页面组件
+│   │   ├── Home.vue              # 首页占位组件
+│   │   ├── WindowConsole.vue     # 基础窗口操作台页面
+│   │   ├── ModelDashboard.vue    # 预测/复盘/诊断复用页面组件
+│   │   └── HistoricalReplayLab.vue # 历史回放实验台页面
 │   │
 │   ├── App.vue
 │   ├── main.ts
@@ -82,12 +84,14 @@ yybf-front-v3/
 | `src/views/Home.vue` | 首页占位组件，默认入口由路由重定向处理 |
 | `src/views/WindowConsole.vue` | 基础窗口操作台页面，承载开奖、窗口矩阵、模拟选择、窗口同步 |
 | `src/views/ModelDashboard.vue` | 预测/复盘/诊断复用页面组件，通过路由模式分别承载实时预测台、快照复盘台和诊断研究台 |
+| `src/views/HistoricalReplayLab.vue` | 历史回放实验台页面，承载开奖前视角批量回放、保存实验和读取实验详情 |
 | `src/components/lottery/model/DrawContextPanel.vue` | 开奖信息、窗口/结构链同步按钮和开奖后执行链展示 |
 | `src/components/lottery/model/SnapshotListPanel.vue` | 快照复盘台最近快照列表展示 |
 | `src/components/lottery/model/HitNumberList.vue` | 红球/蓝球候选列表命中标色 |
 | `src/components/lottery/model/TicketNumberText.vue` | 完整票面红蓝命中标色 |
 | `src/components/lottery/model/TicketTextByText.vue` | 文本票面解析和命中标色 |
 | `src/api/modules/modelPrediction.ts` | 模型预测接口封装 |
+| `src/api/modules/historicalReplay.ts` | 历史回放实验接口封装 |
 | `docs/frontend-module-plan.md` | 基础窗口操作台与模型预测/诊断结果台的拆分规划 |
 | `docs/frontend-development-workflow.md` | 前端开发流程、页面职责和进度记录 |
 

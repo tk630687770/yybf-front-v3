@@ -37,6 +37,13 @@
           >
             诊断研究台
           </RouterLink>
+          <RouterLink
+            to="/historical-replay-lab"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            历史回放实验台
+          </RouterLink>
         </nav>
       </div>
     </header>

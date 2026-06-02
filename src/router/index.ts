@@ -6,6 +6,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
 import WindowConsole from '../views/WindowConsole.vue';
 import ModelDashboard from '../views/ModelDashboard.vue';
+import HistoricalReplayLab from '../views/HistoricalReplayLab.vue';
 
 /**
  * 路由配置数组
@@ -39,6 +40,12 @@ const routes: RouteRecordRaw[] = [
     name: 'DiagnosticLab',             // 诊断研究台路由名称
     component: ModelDashboard,         // 复用模型页面组件，通过路由名称切换页面模式
     meta: { title: '诊断研究台' }       // 页面标题
+  },
+  {
+    path: '/historical-replay-lab',        // 历史回放实验台路径
+    name: 'HistoricalReplayLab',           // 历史回放实验台路由名称
+    component: HistoricalReplayLab,        // 历史回放实验台组件
+    meta: { title: '历史回放实验台' }       // 页面标题
   },
   {
     path: '/model-dashboard',          // 旧模型结果台路径
