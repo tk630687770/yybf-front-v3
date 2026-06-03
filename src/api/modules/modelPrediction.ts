@@ -114,6 +114,8 @@ export interface MultiWindowFinalPredictResult {
   recommendedRedNumbers: string[];                  // 推荐红球号码
   recommendedBlueNumber: string;                    // 推荐蓝球号码
   recommendedTicketText: string;                    // 推荐票面文本
+  redEntryCandidateNumbers?: string[];               // 红球第一轮入口入围号码
+  blueEntryCandidateNumbers?: string[];              // 蓝球第一轮入口入围号码
   redCombinations: RedCombinationPredictResult[];   // 红球组合榜
   blueCandidates: BlueCandidatePredictResult[];     // 蓝球候选榜
   tickets: MultiWindowFinalTicket[];                // 红蓝合并票面榜
@@ -1049,6 +1051,14 @@ export async function getPredictionSnapshotsByQiHao(
   return request.get('/ssq/window/axis/prediction/snapshot/list', {
     params: { predictQiHao }
   });
+}
+
+/**
+ * 回填历史快照中的第一轮入口池
+ * @returns 实际补写的快照数量
+ */
+export async function backfillPredictionSnapshotEntryPool(): Promise<ApiResponse<number>> {
+  return request.post('/ssq/window/axis/prediction/snapshot/backfill-entry-pool');
 }
 
 /**

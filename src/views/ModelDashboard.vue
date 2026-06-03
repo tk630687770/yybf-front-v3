@@ -2254,6 +2254,60 @@
       <div v-else class="empty-text">暂无预测结果，请点击“刷新预测”。</div>
     </section>
 
+    <!-- 第一轮入口入围池：展示组合枚举前的红球入口和蓝球入口，便于判断号码在哪一层丢失 -->
+    <section v-if="isPredictionPage || isReviewPage" class="bg-bg-card rounded-lg p-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">第一轮入口入围池</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            红球入口是正式组合枚举前的红10 TopN入围号码；蓝球入口是蓝10/16/32三窗口评分TopN候选。它们用于判断真实号码是否在第一阶段就已经丢失。
+          </p>
+        </div>
+        <span class="text-xs text-text-secondary">
+          预测期号：{{ finalPredict?.predictQiHao ?? '--' }}
+        </span>
+      </div>
+
+      <template v-if="finalPredict">
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
+          <div class="summary-block">
+            <div class="summary-label">
+              红球入口池
+              <span class="text-text-secondary">Top{{ finalPredict.redEntryCandidateNumbers?.length ?? finalPredict.redCandidateLimit }}</span>
+            </div>
+            <div class="summary-value">
+              <HitNumberList
+                v-if="finalPredict.redEntryCandidateNumbers?.length"
+                :numbers="finalPredict.redEntryCandidateNumbers"
+                kind="red"
+                :actual-red-numbers="reviewResult?.actualRedNumbers"
+              />
+              <span v-else class="text-yellow-400">当前快照暂未保存红球入口池，请先执行历史入口池回填或重新保存快照。</span>
+            </div>
+          </div>
+          <div class="summary-block">
+            <div class="summary-label">
+              蓝球入口池
+              <span class="text-text-secondary">Top{{ finalPredict.blueEntryCandidateNumbers?.length ?? finalPredict.blueTopLimit }}</span>
+            </div>
+            <div class="summary-value">
+              <HitNumberList
+                v-if="finalPredict.blueEntryCandidateNumbers?.length"
+                :numbers="finalPredict.blueEntryCandidateNumbers"
+                kind="blue"
+                :actual-blue-number="reviewResult?.actualBlueNumber"
+              />
+              <span v-else class="text-yellow-400">当前快照暂未保存蓝球入口池。</span>
+            </div>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-text-secondary leading-6">
+          如果入口池没有覆盖开奖号码，后续9+1、10注6+1通常很难救回；如果入口池覆盖但后续票面没有覆盖，问题更可能出在组合排序或压缩出票阶段。
+        </p>
+      </template>
+      <div v-else class="empty-text">暂无入口池数据，请点击“刷新预测”。</div>
+    </section>
+
     <!-- 9+1复式方案：独立展示真正的9红+1蓝复式投注口径 -->
     <details v-if="isPredictionPage || isReviewPage" class="diagnosis-collapse bg-bg-card rounded-lg p-4" open>
       <summary class="diagnosis-summary">
