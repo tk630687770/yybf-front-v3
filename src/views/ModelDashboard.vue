@@ -3037,13 +3037,24 @@ const SNAPSHOT_MODEL_VERSION = 'front-v3-snapshot-v2-ac-shape';
 const latestDraw = computed(() => lotteryStore.latestDraw);
 
 /**
- * 当前页面关注的预测期号
+ * 实时接口返回的预测期号。
+ * @description 实时预测台必须优先看接口现算结果，不能被页面上挂载的历史快照期号带偏。
  */
-const currentPredictQiHao = computed(() => activeSnapshot.value?.predictQiHao
-  ?? finalPredict.value?.predictQiHao
+const realtimePredictQiHao = computed(() => finalPredict.value?.predictQiHao
   ?? ninePlusOnePredict.value?.predictQiHao
   ?? singlePlan.value?.predictQiHao
   ?? '');
+
+/**
+ * 当前页面关注的预测期号。
+ * @description 历史快照模式看快照期号；实时预测模式看实时接口期号，快照只作为兜底展示。
+ */
+const currentPredictQiHao = computed(() => {
+  if (viewMode.value === 'snapshot') {
+    return activeSnapshot.value?.predictQiHao ?? realtimePredictQiHao.value;
+  }
+  return realtimePredictQiHao.value || activeSnapshot.value?.predictQiHao || '';
+});
 
 /**
  * 9+1复式采用的蓝球
@@ -3072,7 +3083,8 @@ const reviewAvailabilityText = computed(() => {
 });
 
 /**
- * 当前预测是否可能还停留在已开奖期号
+ * 当前实时预测是否仍停留在最新已开奖期号。
+ * @description 这里只判断“预测链是否推进”，不再等同于窗口基础数据是否已经同步。
  */
 const predictionNeedsWindowSync = computed(() => {
   if (workflowHasNextSnapshotEvidence.value) {
@@ -3141,6 +3153,39 @@ const workflowHasNextSnapshotEvidence = computed(() => {
 });
 
 /**
+ * 本地窗口基础数据是否已经覆盖最新期开奖期号。
+ * @description 窗口基础状态来自浏览器IndexedDB中的窗口元信息；预测是否推进由实时预测期号单独判断。
+ */
+const windowBaseSyncedToLatestDraw = computed(() => {
+  const latestQiHao = latestDraw.value?.qiHao;
+  if (!latestQiHao) {
+    return false;
+  }
+  const windowInfos = lotteryStore.windowDataInfoList;
+  if (windowInfos.length === 0) {
+    return false;
+  }
+  return windowInfos.every(item => item.latestQiHao && Number(item.latestQiHao) >= Number(latestQiHao));
+});
+
+/**
+ * 本地窗口基础数据期号摘要。
+ * @description 用最小和最大窗口期号说明窗口缓存状态，方便区分“窗口没同步”和“预测链没推进”。
+ */
+const windowBaseQiHaoSummary = computed(() => {
+  const qiHaoList = lotteryStore.windowDataInfoList
+    .map(item => item.latestQiHao)
+    .filter((qiHao): qiHao is string => Boolean(qiHao));
+  if (qiHaoList.length === 0) {
+    return '暂无本地窗口缓存';
+  }
+  const sorted = [...qiHaoList].sort((left, right) => Number(left) - Number(right));
+  const minQiHao = sorted[0];
+  const maxQiHao = sorted[sorted.length - 1];
+  return minQiHao === maxQiHao ? `窗口缓存至 ${maxQiHao}` : `窗口缓存 ${minQiHao}~${maxQiHao}`;
+});
+
+/**
  * 当前页面的开奖后执行链状态。
  * @description 用于提醒人工操作顺序，不触发接口，也不修改任何预测结果。
  */
@@ -3162,11 +3207,11 @@ const postDrawWorkflowSteps = computed<WorkflowStep[]>(() => {
     {
       key: 'window',
       title: '窗口基础',
-      status: predictionNeedsWindowSync.value ? 'pending' : (hasDraw ? 'done' : 'waiting'),
-      statusText: predictionNeedsWindowSync.value ? '待推进' : (hasDraw ? '已推进' : '等待开奖'),
-      description: predictionNeedsWindowSync.value
-        ? '当前预测期号仍追平开奖期号。'
-        : (nextSnapshot ? `已存在下一期快照 ${nextSnapshot.predictQiHao}。` : '窗口期号未显示明显滞后。')
+      status: windowBaseSyncedToLatestDraw.value ? 'done' : (hasDraw ? 'pending' : 'waiting'),
+      statusText: windowBaseSyncedToLatestDraw.value ? '已推进' : (hasDraw ? '待推进' : '等待开奖'),
+      description: windowBaseSyncedToLatestDraw.value
+        ? windowBaseQiHaoSummary.value
+        : `最新开奖 ${latestDraw.value?.qiHao ?? '--'}，${windowBaseQiHaoSummary.value}。`
     },
     {
       key: 'review',
@@ -4607,6 +4652,7 @@ async function refreshDrawContext() {
   try {
     await lotteryStore.refreshDrawData();
     await lotteryStore.loadAllFromDB();
+    await lotteryStore.loadWindowDataInfoList();
     showMessage('开奖信息同步完成', 'success');
   } catch (err: unknown) {
     showMessage(err instanceof Error ? err.message : '开奖信息同步失败', 'error');
@@ -4622,9 +4668,11 @@ async function refreshDrawContext() {
 async function initializeDrawContext() {
   try {
     await lotteryStore.loadAllFromDB();
+    await lotteryStore.loadWindowDataInfoList();
     if (!lotteryStore.latestDraw) {
       await lotteryStore.refreshDrawData();
       await lotteryStore.loadAllFromDB();
+      await lotteryStore.loadWindowDataInfoList();
     }
   } catch {
     // 开奖上下文加载失败不阻断预测结果展示，用户可点击“同步开奖”重试。

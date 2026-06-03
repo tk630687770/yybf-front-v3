@@ -5,7 +5,7 @@
       <div>
         <h2 class="text-base font-bold text-text-primary">开奖信息</h2>
         <p class="mt-1 text-xs text-text-secondary">
-          如果最新开奖期号和当前预测期号相同，通常表示窗口、坐标或结构族数据还没同步到下一期。
+          如果最新开奖期号和当前预测期号相同，通常表示预测链还没推进到下一期，需要继续检查窗口基础、坐标结构链和快照保存状态。
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -51,8 +51,8 @@
     </div>
 
     <div v-if="predictionNeedsWindowSync" class="mt-3 warning-box">
-      当前预测期号已经追平最新开奖期号。请先同步开奖/窗口，再同步坐标结构链；
-      完成后点击“刷新预测”，再生成下一期快照。
+      当前实时预测期号仍追平最新开奖期号。若窗口基础已经推进，请继续同步坐标结构链；
+      完成后点击“刷新预测”，确认生成下一期结果后再保存快照。
     </div>
 
     <div v-if="axisSyncResults.length > 0" class="mt-3 info-box">
