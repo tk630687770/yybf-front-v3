@@ -47,6 +47,26 @@ export interface HistoricalReplayPeriodResult {
 }
 
 /**
+ * 历史回放阶段转化指标
+ */
+export interface HistoricalReplayStageMetrics {
+  periodCount: number;                           // 全部有效期数
+  entryEvidencePeriodCount: number;              // 具备入口池证据的期数
+  originalEntryAvgHit: number | null;            // 原始入口平均命中
+  fusedEntryAvgHit: number | null;               // 融合入口平均命中
+  ninePlusOneAvgHit: number | null;              // 9红池平均命中
+  bestTicketAvgHit: number | null;               // 10注最佳单式平均命中
+  fusionRescuedAvgHit: number | null;             // 融合入口平均救回
+  entryToNineLostAvgHit: number | null;          // 入口到9红平均流失
+  nineToBestTicketLostAvgHit: number | null;     // 9红到最佳单式平均流失
+  entryToNineRetentionRate: number | null;       // 入口到9红整体保留率
+  nineToBestTicketRetentionRate: number | null;  // 9红到最佳单式整体保留率
+  entryAtLeast4RedRate: number | null;            // 入口至少覆盖4红比例
+  ninePlusOneAtLeast4RedRate: number | null;      // 9红至少覆盖4红比例
+  conclusion: string;                             // 阶段转化结论
+}
+
+/**
  * 历史回放完整结果
  */
 export interface HistoricalReplayResult {
@@ -78,6 +98,7 @@ export interface HistoricalReplayResult {
   dataBoundaryNote: string;                       // 数据边界说明
   elapsedMs: number;                              // 服务端耗时
   periods: HistoricalReplayPeriodResult[];        // 逐期明细
+  stageMetrics: HistoricalReplayStageMetrics;     // 入口、9红和10注之间的阶段转化
   conclusion: string;                             // 结论
 }
 

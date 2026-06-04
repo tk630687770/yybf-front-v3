@@ -206,6 +206,54 @@
       <div class="mt-4 boundary-note">
         {{ activeResult.conclusion }}
       </div>
+      <div v-if="activeResult.stageMetrics" class="mt-4 stage-conversion-panel">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="distribution-title">阶段转化诊断</div>
+            <div class="mt-1 text-xs text-text-secondary">
+              观察入口池命中的真实红球，经过9红压缩和10注出票后被保留或丢失的程度。
+            </div>
+          </div>
+          <div class="text-xs text-text-secondary">
+            入口证据：{{ activeResult.stageMetrics.entryEvidencePeriodCount }} /
+            {{ activeResult.stageMetrics.periodCount }} 期
+          </div>
+        </div>
+        <div class="mt-3 metric-grid">
+          <div class="metric-card">
+            <div class="metric-label">原始 / 融合入口均值</div>
+            <div class="metric-value comparison-small">
+              {{ nullableNumberText(activeResult.stageMetrics.originalEntryAvgHit) }}
+              /
+              {{ nullableNumberText(activeResult.stageMetrics.fusedEntryAvgHit) }}
+            </div>
+            <div class="metric-hint">融合平均救回 {{ nullableNumberText(activeResult.stageMetrics.fusionRescuedAvgHit) }} 红</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">入口 → 9红</div>
+            <div class="metric-value">{{ nullablePercent(activeResult.stageMetrics.entryToNineRetentionRate) }}</div>
+            <div class="metric-hint">平均流失 {{ nullableNumberText(activeResult.stageMetrics.entryToNineLostAvgHit) }} 红</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">9红 → 10注最佳单式</div>
+            <div class="metric-value">{{ nullablePercent(activeResult.stageMetrics.nineToBestTicketRetentionRate) }}</div>
+            <div class="metric-hint">平均流失 {{ nullableNumberText(activeResult.stageMetrics.nineToBestTicketLostAvgHit) }} 红</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">入口 / 9红至少4红</div>
+            <div class="metric-value comparison-small">
+              {{ nullablePercent(activeResult.stageMetrics.entryAtLeast4RedRate) }}
+              /
+              {{ nullablePercent(activeResult.stageMetrics.ninePlusOneAtLeast4RedRate) }}
+            </div>
+            <div class="metric-hint">判断覆盖优势能否通过压缩保留下来</div>
+          </div>
+        </div>
+        <div class="mt-3 boundary-note">
+          {{ activeResult.stageMetrics.conclusion }}
+          “10注最佳单式”是开奖后从10注中选择命中最多的一注，只用于观察压缩上限。
+        </div>
+      </div>
       <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="distribution-card">
           <div class="distribution-title">最高红球命中分布</div>
@@ -699,6 +747,26 @@ function numberText(value: number | null | undefined) {
 }
 
 /**
+ * 格式化允许为空的阶段命中数字
+ * @param value 阶段指标
+ * @returns 可读数字或不适用
+ */
+function nullableNumberText(value: number | null | undefined) {
+  // 空值表示当前实验没有对应阶段证据。
+  return value == null ? '不适用' : value.toFixed(2);
+}
+
+/**
+ * 格式化允许为空的阶段比例
+ * @param value 阶段比例
+ * @returns 百分比或不适用
+ */
+function nullablePercent(value: number | null | undefined) {
+  // 空值表示当前实验没有对应阶段证据。
+  return value == null ? '不适用' : percent(value);
+}
+
+/**
  * 构建对比指标行
  * @param label 指标名称
  * @param left 左侧值
@@ -858,6 +926,13 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text-primary);
+}
+
+.stage-conversion-panel {
+  padding: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  background: rgba(8, 47, 73, 0.22);
 }
 
 .section-subtitle {
