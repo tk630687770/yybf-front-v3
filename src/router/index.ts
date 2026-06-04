@@ -7,6 +7,7 @@ import type { RouteRecordRaw } from 'vue-router';
 import WindowConsole from '../views/WindowConsole.vue';
 import ModelDashboard from '../views/ModelDashboard.vue';
 import HistoricalReplayLab from '../views/HistoricalReplayLab.vue';
+import EntryRecallLab from '../views/EntryRecallLab.vue';
 
 /**
  * 路由配置数组
@@ -46,6 +47,12 @@ const routes: RouteRecordRaw[] = [
     name: 'HistoricalReplayLab',           // 历史回放实验台路由名称
     component: HistoricalReplayLab,        // 历史回放实验台组件
     meta: { title: '历史回放实验台' }       // 页面标题
+  },
+  {
+    path: '/entry-recall-lab',             // 红球入口召回研究台路径
+    name: 'EntryRecallLab',                 // 红球入口召回研究台路由名称
+    component: EntryRecallLab,              // 红球入口召回专项独立页面
+    meta: { title: '红球入口召回研究台' }    // 页面标题
   },
   {
     path: '/model-dashboard',          // 旧模型结果台路径

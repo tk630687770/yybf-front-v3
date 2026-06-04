@@ -44,6 +44,13 @@
           >
             历史回放实验台
           </RouterLink>
+          <RouterLink
+            to="/entry-recall-lab"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            入口召回研究台
+          </RouterLink>
         </nav>
       </div>
     </header>

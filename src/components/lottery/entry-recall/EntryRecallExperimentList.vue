@@ -170,14 +170,21 @@ function emitCompare() {
  * 格式化实验入口规模。
  */
 function entrySizesText(experiment: EntryRecallExperimentEntity) {
-  return safeJsonArray<number>(experiment.entrySizesJson).map((size) => `Top${size}`).join(', ') || '-';
+  const parsed = safeJsonValue(experiment.entrySizesJson);
+  const entrySizes = Array.isArray(parsed) ? parsed.filter((size): size is number => typeof size === 'number') : [];
+  return entrySizes.map((size) => `Top${size}`).join(', ') || '-';
 }
 
 /**
  * 将组件配置JSON转为可快速阅读的摘要。
  */
 function componentText(experiment: EntryRecallExperimentEntity) {
-  const components = safeJsonArray<Record<string, unknown>>(experiment.componentConfigJson);
+  const parsed = safeJsonValue(experiment.componentConfigJson);
+  const components = Array.isArray(parsed)
+    ? parsed as Record<string, unknown>[]
+    : parsed && typeof parsed === 'object'
+      ? [parsed as Record<string, unknown>]
+      : [];
   return components.map((component) => {
     const code = String(component.componentCode ?? component.code ?? '-');
     const weight = component.weight == null ? '' : `×${component.weight}`;
@@ -198,14 +205,13 @@ function metricText(experiment: EntryRecallExperimentEntity, entrySize: number) 
 }
 
 /**
- * 安全解析JSON数组。
+ * 安全解析任意JSON值。
  */
-function safeJsonArray<T>(value: string): T[] {
+function safeJsonValue(value: string): unknown {
   try {
-    const parsed = JSON.parse(value || '[]');
-    return Array.isArray(parsed) ? parsed as T[] : [];
+    return JSON.parse(value || 'null');
   } catch {
-    return [];
+    return null;
   }
 }
 

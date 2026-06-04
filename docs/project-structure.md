@@ -13,7 +13,8 @@ yybf-front-v3/
 │   │   ├── request.ts         # Axios 封装，含拦截器和错误处理
 │   │   └── modules/            # 分模块接口
 │   │       ├── lottery.ts     # 彩票相关接口
-│   │       └── historicalReplay.ts # 历史回放实验接口
+│   │       ├── historicalReplay.ts # 历史回放实验接口
+│   │       └── entryRecall.ts # 红球入口召回专项接口
 │   │
 │   ├── assets/                 # 静态资源
 │   │   └── (默认文件)
@@ -26,7 +27,8 @@ yybf-front-v3/
 │   │       ├── WindowLevelPanel.vue # 窗口等级面板组件
 │   │       ├── WindowLevelTable.vue  # 窗口等级表格组件
 │   │       ├── WindowStatusModal.vue # 窗口状态弹窗组件
-│   │       └── model/                # 模型预测、快照复盘、诊断展示组件
+│   │       ├── model/                # 模型预测、快照复盘、诊断展示组件
+│   │       └── entry-recall/         # 红球入口召回专项小组件
 │   │
 │   ├── composables/            # 组合式函数
 │   │   └── useDatabase.ts      # IndexedDB 数据库封装（Dexie.js）
@@ -47,7 +49,8 @@ yybf-front-v3/
 │   │   ├── Home.vue              # 首页占位组件
 │   │   ├── WindowConsole.vue     # 基础窗口操作台页面
 │   │   ├── ModelDashboard.vue    # 预测/复盘/诊断复用页面组件
-│   │   └── HistoricalReplayLab.vue # 历史回放实验台页面
+│   │   ├── HistoricalReplayLab.vue # 历史回放实验台页面
+│   │   └── EntryRecallLab.vue     # 红球入口召回研究台页面
 │   │
 │   ├── App.vue
 │   ├── main.ts
@@ -85,6 +88,8 @@ yybf-front-v3/
 | `src/views/WindowConsole.vue` | 基础窗口操作台页面，承载开奖、窗口矩阵、模拟选择、窗口同步 |
 | `src/views/ModelDashboard.vue` | 预测/复盘/诊断复用页面组件，通过路由模式分别承载实时预测台、快照复盘台和诊断研究台 |
 | `src/views/HistoricalReplayLab.vue` | 历史回放实验台页面，承载开奖前视角批量回放、保存实验、读取实验详情和双实验横向对比 |
+| `src/views/EntryRecallLab.vue` | 红球入口召回研究台页面，只编排入口参数、指标、证据、实验库、稳定性和网格状态 |
+| `src/components/lottery/entry-recall/` | 入口召回参数、指标、逐期逐球证据、实验对比、稳定性和网格组件 |
 | `src/components/lottery/model/DrawContextPanel.vue` | 开奖信息、窗口/结构链同步按钮和开奖后执行链展示 |
 | `src/components/lottery/model/SnapshotListPanel.vue` | 快照复盘台最近快照列表展示 |
 | `src/components/lottery/model/HitNumberList.vue` | 红球/蓝球候选列表命中标色 |
@@ -92,6 +97,7 @@ yybf-front-v3/
 | `src/components/lottery/model/TicketTextByText.vue` | 文本票面解析和命中标色 |
 | `src/api/modules/modelPrediction.ts` | 模型预测接口封装 |
 | `src/api/modules/historicalReplay.ts` | 历史回放实验接口封装 |
+| `src/api/modules/entryRecall.ts` | 红球入口召回运行、保存、详情、对比、稳定性和网格接口封装 |
 | `docs/frontend-module-plan.md` | 基础窗口操作台与模型预测/诊断结果台的拆分规划 |
 | `docs/frontend-development-workflow.md` | 前端开发流程、页面职责和进度记录 |
 
