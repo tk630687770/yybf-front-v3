@@ -44,7 +44,15 @@
             />
           </td>
           <td class="font-bold text-text-primary">{{ experiment.id }}</td>
-          <td>{{ experiment.experimentName }}</td>
+          <td class="name-cell">
+            <div class="experiment-title">{{ experimentDisplayName(experiment) }}</div>
+            <div v-if="experiment.experimentDescriptionCn" class="experiment-description">
+              {{ experiment.experimentDescriptionCn }}
+            </div>
+            <div v-if="shouldShowRawName(experiment)" class="experiment-raw-name">
+              原始名：{{ experiment.experimentName }}
+            </div>
+          </td>
           <td>{{ experiment.strategyCode }} / {{ experiment.strategyVersion }}</td>
           <td>{{ experiment.startQiHao }} ~ {{ experiment.endQiHao }}</td>
           <td>{{ experiment.effectivePeriodCount }}</td>
@@ -86,7 +94,12 @@
           <tbody>
           <tr v-for="bundle in comparisonBundles" :key="bundle.experiment.id">
             <td class="font-bold text-text-primary">{{ bundle.experiment.id }}</td>
-            <td>{{ bundle.experiment.experimentName }}</td>
+            <td class="name-cell">
+              <div class="experiment-title">{{ experimentDisplayName(bundle.experiment) }}</div>
+              <div v-if="bundle.experiment.experimentDescriptionCn" class="experiment-description">
+                {{ bundle.experiment.experimentDescriptionCn }}
+              </div>
+            </td>
             <td>
               {{ bundle.experiment.startQiHao }} ~ {{ bundle.experiment.endQiHao }}
               / {{ bundle.experiment.effectivePeriodCount }}期
@@ -164,6 +177,23 @@ function toggleExperiment(experimentId: number) {
  */
 function emitCompare() {
   emit('compare', [...selectedIds.value].sort((left, right) => left - right));
+}
+
+/**
+ * 获取实验的页面展示名，优先使用后端生成的中文展示名。
+ */
+function experimentDisplayName(experiment: EntryRecallExperimentEntity) {
+  return experiment.experimentLabelCn?.trim()
+    || experiment.experimentName?.trim()
+    || `入口召回实验 ${experiment.id}`;
+}
+
+/**
+ * 原始名与中文展示名不同时保留辅助展示，方便追溯早期实验输入。
+ */
+function shouldShowRawName(experiment: EntryRecallExperimentEntity) {
+  const rawName = experiment.experimentName?.trim();
+  return Boolean(rawName && rawName !== experimentDisplayName(experiment));
 }
 
 /**
@@ -312,6 +342,29 @@ function formatMs(value: number | null | undefined) {
   max-width: 360px;
   white-space: normal !important;
   line-height: 1.5;
+}
+
+.name-cell {
+  min-width: 260px;
+  max-width: 380px;
+  white-space: normal !important;
+  line-height: 1.5;
+}
+
+.experiment-title {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.experiment-description,
+.experiment-raw-name {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.experiment-raw-name {
+  color: rgba(234, 234, 234, 0.45);
 }
 
 .action-button,

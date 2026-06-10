@@ -96,6 +96,8 @@ export interface EntryRecallBaselineResult {
 export interface EntryRecallExperimentEntity {
   id: number;                                         // 实验ID
   experimentName: string;                             // 实验名称
+  experimentLabelCn: string | null;                   // 实验中文展示名
+  experimentDescriptionCn: string | null;             // 实验中文说明
   experimentFingerprint: string;                      // 唯一实验指纹
   researchType: string;                               // 研究类型
   strategyCode: string;                               // 策略编码
