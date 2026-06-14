@@ -45,8 +45,9 @@
                   v-for="entrySize in entrySizeOptions"
                   :key="entrySize"
                   :value="String(entrySize)"
+                  :disabled="entrySize > MAX_PARALLEL_ENTRY_SIZE"
                 >
-                  Top{{ entrySize }}
+                  Top{{ entrySize }}{{ entrySize > MAX_PARALLEL_ENTRY_SIZE ? '（出票暂不支持）' : '' }}
                 </option>
               </select>
               <div class="mini-button-row">
@@ -84,7 +85,7 @@
           <div class="boundary-note">
             <strong>操作边界：</strong>刷新预测只预览不落库；保存预测快照会写入独立实验快照表且不可覆盖；
             复盘并保存诊断包只对已保存快照执行，未开奖时后端会拒绝复盘。当前将生成
-            {{ requestCount }} 个实验/规模组合<span v-if="skippedRequestCount > 0">，已跳过 {{ skippedRequestCount }} 个实验未声明的入口规模</span>。
+            {{ requestCount }} 个实验/规模组合<span v-if="skippedRequestCount > 0">，已跳过 {{ skippedRequestCount }} 个实验未声明或当前出票链路暂不支持的入口规模</span>。
           </div>
 
           <div v-if="message" class="message" :class="messageClass">{{ message }}</div>
@@ -206,6 +207,9 @@ import type {
   EntryRecallExperimentEntity
 } from '../../../api/modules/entryRecall';
 import type { DrawRecord } from '../../../types';
+
+// 当前拟正式出票链路复用的组合评分服务最多支持22个红球入口池。
+const MAX_PARALLEL_ENTRY_SIZE = 22;
 
 const props = defineProps<{
   visible: boolean;
@@ -384,7 +388,7 @@ function buildValidRequestDescriptors() {
     }
     const supportedEntrySizes = supportedEntrySizeSet(experiment);
     return entrySizes
-      .filter((entrySize) => supportedEntrySizes.has(entrySize))
+      .filter((entrySize) => entrySize <= MAX_PARALLEL_ENTRY_SIZE && supportedEntrySizes.has(entrySize))
       .map((entrySize) => ({ experimentId, entrySize }));
   });
 }
@@ -441,7 +445,9 @@ function defaultExperimentIds() {
  * 选择全部入口规模。
  */
 function selectAllEntrySizes() {
-  selectedEntrySizeTexts.value = entrySizeOptions.value.map(String);
+  selectedEntrySizeTexts.value = entrySizeOptions.value
+    .filter((entrySize) => entrySize <= MAX_PARALLEL_ENTRY_SIZE)
+    .map(String);
 }
 
 /**
