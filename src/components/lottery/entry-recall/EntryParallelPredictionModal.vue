@@ -17,25 +17,63 @@
           <section class="control-panel">
             <label class="field">
               <span>预测期号</span>
-              <input v-model.trim="localQiHao" class="form-input" placeholder="例如 2026066" />
+              <input
+                v-model.trim="localQiHao"
+                class="form-input"
+                list="entry-parallel-qihao-list"
+                placeholder="例如 2026066"
+              />
+              <datalist id="entry-parallel-qihao-list">
+                <option
+                  v-for="qiHao in qiHaoOptions"
+                  :key="qiHao"
+                  :value="qiHao"
+                />
+              </datalist>
             </label>
-            <label class="field">
+            <div class="draw-summary">
+              <span class="draw-summary-label">开奖状态</span>
+              <span v-if="selectedDraw" class="draw-ticket">
+                {{ drawTicketText(selectedDraw) }}
+              </span>
+              <span v-else class="text-text-secondary">未开奖</span>
+            </div>
+            <label class="field multi-field">
               <span>入口规模</span>
-              <select v-model.number="localEntrySize" class="form-input">
-                <option :value="15">Top15</option>
-                <option :value="18">Top18</option>
-                <option :value="20">Top20</option>
-                <option :value="22">Top22</option>
-                <option :value="24">Top24</option>
+              <select v-model="selectedEntrySizeTexts" class="form-input multi-select" multiple>
+                <option
+                  v-for="entrySize in entrySizeOptions"
+                  :key="entrySize"
+                  :value="String(entrySize)"
+                >
+                  Top{{ entrySize }}
+                </option>
               </select>
+              <div class="mini-button-row">
+                <button class="mini-button" type="button" @click="selectAllEntrySizes">全部规模</button>
+                <button class="mini-button" type="button" @click="clearEntrySizes">清空</button>
+              </div>
             </label>
-            <label class="field field-wide">
-              <span>实验ID</span>
-              <input v-model.trim="localExperimentIdsText" class="form-input" placeholder="留空表示使用覆盖该期的实验" />
+            <label class="field field-wide multi-field">
+              <span>实验</span>
+              <select v-model="selectedExperimentIdTexts" class="form-input experiment-select" multiple>
+                <option
+                  v-for="experiment in experimentOptions"
+                  :key="experiment.id"
+                  :value="String(experiment.id)"
+                >
+                  {{ experiment.id }} - {{ experimentDisplayName(experiment) }}
+                </option>
+              </select>
+              <div class="mini-button-row">
+                <button class="mini-button" type="button" @click="selectAllExperiments">全部实验</button>
+                <button class="mini-button" type="button" @click="selectCoveredExperiments">覆盖当前期</button>
+                <button class="mini-button" type="button" @click="clearExperiments">清空</button>
+              </div>
             </label>
             <div class="button-row">
-              <button class="action-button" :disabled="loading" @click="emitPreview">刷新预测</button>
-              <button class="action-button action-button-primary" :disabled="loading" @click="emitSave">保存预测快照</button>
+              <button class="action-button" :disabled="loading || requestCount === 0" @click="emitPreview">刷新预测</button>
+              <button class="action-button action-button-primary" :disabled="loading || requestCount === 0" @click="emitSave">保存预测快照</button>
               <button class="action-button" :disabled="loading" @click="emitRefreshSaved">读取已保存</button>
               <button class="action-button" :disabled="loading || !savedSnapshots.length" @click="emitReview">
                 复盘并保存诊断包
@@ -45,7 +83,8 @@
 
           <div class="boundary-note">
             <strong>操作边界：</strong>刷新预测只预览不落库；保存预测快照会写入独立实验快照表且不可覆盖；
-            复盘并保存诊断包只对已保存快照执行，未开奖时后端会拒绝复盘。
+            复盘并保存诊断包只对已保存快照执行，未开奖时后端会拒绝复盘。当前将生成
+            {{ requestCount }} 个实验/规模组合<span v-if="skippedRequestCount > 0">，已跳过 {{ skippedRequestCount }} 个实验未声明的入口规模</span>。
           </div>
 
           <div v-if="message" class="message" :class="messageClass">{{ message }}</div>
@@ -166,12 +205,14 @@ import type {
   EntryParallelPredictionSnapshot,
   EntryRecallExperimentEntity
 } from '../../../api/modules/entryRecall';
+import type { DrawRecord } from '../../../types';
 
 const props = defineProps<{
   visible: boolean;
   experiments: EntryRecallExperimentEntity[];
   previewSnapshots: EntryParallelPredictionSnapshot[];
   savedSnapshots: EntryParallelPredictionSnapshot[];
+  drawRecords: DrawRecord[];
   loading: boolean;
   message: string;
   messageType: 'success' | 'error' | 'info';
@@ -179,33 +220,39 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  preview: [request: EntryParallelPredictionRequest];
-  save: [request: EntryParallelPredictionRequest];
+  preview: [requests: EntryParallelPredictionRequest[]];
+  save: [requests: EntryParallelPredictionRequest[]];
   refreshSaved: [predictQiHao: string];
   review: [predictQiHao: string, snapshotIds: number[]];
 }>();
 
 // 当前弹窗选择的预测期号，默认取实验库最新结束期号。
 const localQiHao = ref('');
-// 当前弹窗选择的入口规模。
-const localEntrySize = ref(18);
-// 当前弹窗指定实验ID文本，留空时使用页面实验库前30个实验。
-const localExperimentIdsText = ref('');
+// 当前弹窗选择的入口规模，多选后会拆成多次安全请求。
+const selectedEntrySizeTexts = ref<string[]>(['18']);
+// 当前弹窗选择的实验ID，多选后会和入口规模做笛卡尔组合。
+const selectedExperimentIdTexts = ref<string[]>([]);
 
 /**
- * 弹窗打开或实验列表变化时，为期号输入框提供一个可用默认值。
+ * 弹窗打开或实验列表变化时，为期号、入口规模和实验列表提供可用默认值。
  */
 watch(
-  () => [props.visible, props.experiments] as const,
+  () => [props.visible, props.experiments, props.drawRecords] as const,
   () => {
-    if (!props.visible || localQiHao.value) {
+    if (!props.visible) {
       return;
     }
-    localQiHao.value = props.experiments
-      .map((experiment) => experiment.endQiHao)
-      .filter(Boolean)
-      .sort()
-      .at(-1) || '';
+    if (!localQiHao.value) {
+      localQiHao.value = defaultQiHao();
+    }
+    if (!selectedEntrySizeTexts.value.length) {
+      selectedEntrySizeTexts.value = entrySizeOptions.value.includes(18)
+        ? ['18']
+        : entrySizeOptions.value.slice(0, 1).map(String);
+    }
+    if (!selectedExperimentIdTexts.value.length) {
+      selectedExperimentIdTexts.value = defaultExperimentIds().map(String);
+    }
   },
   { immediate: true }
 );
@@ -215,6 +262,57 @@ watch(
  */
 const displaySnapshots = computed(() => {
   return props.savedSnapshots.length ? props.savedSnapshots : props.previewSnapshots;
+});
+
+/**
+ * 可选期号，来自基础窗口操作台同源的本地开奖缓存。
+ */
+const qiHaoOptions = computed(() => {
+  return props.drawRecords
+    .map((record) => record.qiHao)
+    .filter(Boolean)
+    .sort()
+    .reverse();
+});
+
+/**
+ * 当前期号对应的真实开奖；不存在时代表尚未开奖或本地缓存未同步。
+ */
+const selectedDraw = computed(() => {
+  return props.drawRecords.find((record) => record.qiHao === localQiHao.value) ?? null;
+});
+
+/**
+ * 已保存实验下所有出现过的入口规模。
+ */
+const entrySizeOptions = computed(() => {
+  const values = new Set<number>([15, 18, 20, 22, 24]);
+  props.experiments.forEach((experiment) => {
+    safeJsonArray<number>(experiment.entrySizesJson).forEach((entrySize) => {
+      if (Number.isInteger(entrySize) && entrySize > 0) {
+        values.add(entrySize);
+      }
+    });
+  });
+  return Array.from(values).sort((left, right) => left - right);
+});
+
+/**
+ * 实验下拉列表，直接使用当前已加载的实验库。
+ */
+const experimentOptions = computed(() => props.experiments);
+
+/**
+ * 本次刷新或保存会拆分出的请求数量。
+ */
+const requestCount = computed(() => buildValidRequestDescriptors().length);
+
+/**
+ * 用户选择中因实验未声明该入口规模而被跳过的组合数量。
+ */
+const skippedRequestCount = computed(() => {
+  const totalCount = selectedEntrySizes().length * selectedExperimentIds().length;
+  return Math.max(totalCount - requestCount.value, 0);
 });
 
 /**
@@ -234,14 +332,14 @@ const messageClass = computed(() => {
  * 发出预览请求。
  */
 function emitPreview() {
-  emit('preview', buildRequest());
+  emit('preview', buildRequests());
 }
 
 /**
  * 发出保存请求。
  */
 function emitSave() {
-  emit('save', buildRequest());
+  emit('save', buildRequests());
 }
 
 /**
@@ -263,36 +361,115 @@ function emitReview() {
 
 /**
  * 组装后端请求参数。
+ * 每个请求只包含一个实验和一个入口规模，便于前端显示进度并降低单次接口压力。
  */
-function buildRequest(): EntryParallelPredictionRequest {
-  return {
-    predictQiHao: localQiHao.value,
-    experimentIds: selectedExperimentIds(),
-    entrySize: localEntrySize.value
-  };
+function buildRequests(): EntryParallelPredictionRequest[] {
+  return buildValidRequestDescriptors().map(({ entrySize, experimentId }) => ({
+      predictQiHao: localQiHao.value,
+      experimentIds: [experimentId],
+      entrySize
+  }));
 }
 
 /**
- * 解析实验ID；未填写时使用当前实验列表前30项。
+ * 只保留实验声明过的入口规模，避免生成不属于该实验评价口径的快照。
+ */
+function buildValidRequestDescriptors() {
+  const entrySizes = selectedEntrySizes();
+  const experimentsById = new Map(props.experiments.map((experiment) => [experiment.id, experiment]));
+  return selectedExperimentIds().flatMap((experimentId) => {
+    const experiment = experimentsById.get(experimentId);
+    if (!experiment) {
+      return [];
+    }
+    const supportedEntrySizes = supportedEntrySizeSet(experiment);
+    return entrySizes
+      .filter((entrySize) => supportedEntrySizes.has(entrySize))
+      .map((entrySize) => ({ experimentId, entrySize }));
+  });
+}
+
+/**
+ * 解析单个实验声明支持的入口规模。
+ */
+function supportedEntrySizeSet(experiment: EntryRecallExperimentEntity) {
+  return new Set(
+    safeJsonArray<number>(experiment.entrySizesJson)
+      .map((entrySize) => Number(entrySize))
+      .filter((entrySize) => Number.isInteger(entrySize) && entrySize > 0)
+  );
+}
+
+/**
+ * 解析已选入口规模；未选择时默认使用全部规模。
+ */
+function selectedEntrySizes() {
+  const selected = selectedEntrySizeTexts.value
+    .map((text) => Number(text))
+    .filter((entrySize) => Number.isInteger(entrySize) && entrySize > 0);
+  const values = selected.length ? selected : entrySizeOptions.value;
+  return Array.from(new Set(values)).sort((left, right) => left - right);
+}
+
+/**
+ * 解析已选实验ID；未选择时使用覆盖当前期的实验，若无覆盖则使用全部已加载实验。
  */
 function selectedExperimentIds() {
-  const typedIds = localExperimentIdsText.value
-    .split(/[,\s，]+/)
-    .map((text) => Number(text.trim()))
+  const selected = selectedExperimentIdTexts.value
+    .map((text) => Number(text))
     .filter((id) => Number.isInteger(id) && id > 0);
-  if (typedIds.length) {
-    return Array.from(new Set(typedIds));
+  if (selected.length) {
+    return Array.from(new Set(selected));
   }
+  return defaultExperimentIds();
+}
+
+/**
+ * 获取默认实验集合：优先选择覆盖当前期的实验，否则选择全部已加载实验。
+ */
+function defaultExperimentIds() {
   const coveredExperiments = props.experiments
     .filter((experiment) => isQiHaoCovered(experiment, localQiHao.value))
-    .slice(0, 30)
     .map((experiment) => experiment.id);
   if (coveredExperiments.length) {
     return coveredExperiments;
   }
-  return props.experiments
-    .slice(0, 30)
-    .map((experiment) => experiment.id);
+  return props.experiments.map((experiment) => experiment.id);
+}
+
+/**
+ * 选择全部入口规模。
+ */
+function selectAllEntrySizes() {
+  selectedEntrySizeTexts.value = entrySizeOptions.value.map(String);
+}
+
+/**
+ * 清空入口规模选择，后续请求会回退到全部规模。
+ */
+function clearEntrySizes() {
+  selectedEntrySizeTexts.value = [];
+}
+
+/**
+ * 选择全部已加载实验。
+ */
+function selectAllExperiments() {
+  selectedExperimentIdTexts.value = props.experiments.map((experiment) => String(experiment.id));
+}
+
+/**
+ * 选择证据范围覆盖当前预测期号的实验。
+ */
+function selectCoveredExperiments() {
+  selectedExperimentIdTexts.value = defaultExperimentIds().map(String);
+}
+
+/**
+ * 清空实验选择，后续请求会回退到默认实验集合。
+ */
+function clearExperiments() {
+  selectedExperimentIdTexts.value = [];
 }
 
 /**
@@ -300,6 +477,50 @@ function selectedExperimentIds() {
  */
 function isQiHaoCovered(experiment: EntryRecallExperimentEntity, qiHao: string) {
   return Boolean(qiHao && experiment.startQiHao <= qiHao && experiment.endQiHao >= qiHao);
+}
+
+/**
+ * 获取弹窗默认期号：优先使用最新开奖的下期期号，其次退回实验库最新结束期。
+ */
+function defaultQiHao() {
+  const latestDraw = [...props.drawRecords].sort((left, right) => left.qiHao.localeCompare(right.qiHao)).at(-1);
+  if (latestDraw?.nextQiHao) {
+    return latestDraw.nextQiHao;
+  }
+  if (latestDraw?.qiHao) {
+    return latestDraw.qiHao;
+  }
+  return props.experiments
+    .map((experiment) => experiment.endQiHao)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+}
+
+/**
+ * 展示真实开奖票面。
+ */
+function drawTicketText(record: DrawRecord) {
+  return `${record.red1},${record.red2},${record.red3},${record.red4},${record.red5},${record.red6} + ${record.blue}`;
+}
+
+/**
+ * 实验下拉框优先展示中文名称，缺失时退回实验名称。
+ */
+function experimentDisplayName(experiment: EntryRecallExperimentEntity) {
+  return experiment.experimentLabelCn || experiment.experimentName || `实验 ${experiment.id}`;
+}
+
+/**
+ * 安全解析JSON数组。
+ */
+function safeJsonArray<T>(value: string): T[] {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed as T[] : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -439,12 +660,57 @@ const NumberPoolText = defineComponent({
   min-width: 280px;
 }
 
+.multi-field {
+  min-width: 220px;
+}
+
 .form-input {
   border: 1px solid rgba(234, 234, 234, 0.14);
   border-radius: 6px;
   padding: 8px 10px;
   color: var(--color-text-primary);
   background: rgba(15, 23, 42, 0.82);
+}
+
+.multi-select,
+.experiment-select {
+  min-height: 92px;
+  padding: 6px 8px;
+}
+
+.draw-summary {
+  min-width: 190px;
+  border: 1px solid rgba(234, 234, 234, 0.14);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.draw-summary-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.draw-ticket {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.mini-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mini-button {
+  border: 1px solid rgba(234, 234, 234, 0.12);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--color-text-primary);
+  background: rgba(22, 33, 62, 0.8);
 }
 
 .button-row {

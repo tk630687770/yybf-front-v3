@@ -27,7 +27,7 @@
           <th>对比</th>
           <th>ID</th>
           <th>实验名称</th>
-          <th>策略 / 版本</th>
+          <th>策略<br />版本</th>
           <th>范围</th>
           <th>有效期</th>
           <th>入口规模</th>
@@ -56,7 +56,10 @@
               原始名：{{ experiment.experimentName }}
             </div>
           </td>
-          <td>{{ experiment.strategyCode }} / {{ experiment.strategyVersion }}</td>
+          <td>
+            <div class="strategy-code">{{ experiment.strategyCode }}</div>
+            <div class="strategy-version">{{ experiment.strategyVersion }}</div>
+          </td>
           <td>{{ experiment.startQiHao }} ~ {{ experiment.endQiHao }}</td>
           <td>{{ experiment.effectivePeriodCount }}</td>
           <td>{{ entrySizesText(experiment) }}</td>
@@ -369,6 +372,16 @@ function formatMs(value: number | null | undefined) {
 
 .experiment-raw-name {
   color: rgba(234, 234, 234, 0.45);
+}
+
+.strategy-code {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.strategy-version {
+  margin-top: 3px;
+  color: var(--color-text-secondary);
 }
 
 .action-button,

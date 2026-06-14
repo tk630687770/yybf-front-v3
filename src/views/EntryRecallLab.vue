@@ -39,6 +39,7 @@
       :experiments="experiments"
       :preview-snapshots="entryParallelPreviewSnapshots"
       :saved-snapshots="entryParallelSavedSnapshots"
+      :draw-records="lotteryStore.drawRecords"
       :loading="entryParallelLoading"
       :message="entryParallelMessage"
       :message-type="entryParallelMessageType"
@@ -66,6 +67,7 @@ import EntryRecallGridPanel from '../components/lottery/entry-recall/EntryRecall
 import EntryRecallMetricTable from '../components/lottery/entry-recall/EntryRecallMetricTable.vue';
 import EntryParallelPredictionModal from '../components/lottery/entry-recall/EntryParallelPredictionModal.vue';
 import EntryRecallStabilityPanel from '../components/lottery/entry-recall/EntryRecallStabilityPanel.vue';
+import { useLotteryStore } from '@/stores/lottery';
 import {
   compareEntryRecallExperiments,
   getEntryRecallExperimentDetail,
@@ -121,6 +123,8 @@ const messageType = ref<'success' | 'error' | 'info'>('info');
 // 入口实验拟正式预测弹窗提示。
 const entryParallelMessage = ref('');
 const entryParallelMessageType = ref<'success' | 'error' | 'info'>('info');
+// 开奖数据缓存，用于拟正式弹窗选择期号和展示真实开奖状态。
+const lotteryStore = useLotteryStore();
 
 /**
  * 页面提示样式。
@@ -240,21 +244,21 @@ async function runGridPreview(request: EntryRecallGridPreviewRequest) {
  */
 function openEntryParallelPrediction() {
   entryParallelVisible.value = true;
-  setEntryParallelMessage('请选择期号后刷新预测；第一版只保存入口池快照。', 'info');
+  setEntryParallelMessage('请选择期号、入口规模和实验后刷新预测；刷新只预览，保存才写入独立快照表。', 'info');
 }
 
 /**
  * 预览入口实验拟正式预测，不落库。
  */
-async function previewEntryParallel(request: EntryParallelPredictionRequest) {
-  if (!validateEntryParallelRequest(request)) {
+async function previewEntryParallel(requests: EntryParallelPredictionRequest[]) {
+  if (!validateEntryParallelRequests(requests)) {
     return;
   }
   entryParallelLoading.value = true;
-  setEntryParallelMessage('正在刷新入口实验拟正式预测...', 'info');
+  entryParallelSavedSnapshots.value = [];
+  entryParallelPreviewSnapshots.value = [];
   try {
-    const response = await previewEntryParallelPrediction(request);
-    entryParallelPreviewSnapshots.value = response ?? [];
+    entryParallelPreviewSnapshots.value = await runEntryParallelRequests(requests, previewEntryParallelPrediction, '刷新拟正式预测');
     setEntryParallelMessage(`预览完成：${entryParallelPreviewSnapshots.value.length} 条，未落库。`, 'success');
   } catch (error) {
     setEntryParallelMessage(`刷新拟正式预测失败：${errorText(error)}`, 'error');
@@ -266,19 +270,17 @@ async function previewEntryParallel(request: EntryParallelPredictionRequest) {
 /**
  * 保存入口实验拟正式预测快照，保存后重新读取该期已保存数据。
  */
-async function saveEntryParallel(request: EntryParallelPredictionRequest) {
-  if (!validateEntryParallelRequest(request)) {
+async function saveEntryParallel(requests: EntryParallelPredictionRequest[]) {
+  if (!validateEntryParallelRequests(requests)) {
     return;
   }
   entryParallelLoading.value = true;
-  setEntryParallelMessage('正在保存入口实验拟正式预测快照...', 'info');
   try {
-    const response = await saveEntryParallelPrediction(request);
-    entryParallelSavedSnapshots.value = response ?? [];
+    entryParallelSavedSnapshots.value = await runEntryParallelRequests(requests, saveEntryParallelPrediction, '保存拟正式快照');
     const duplicateCount = entryParallelSavedSnapshots.value.filter((snapshot) => snapshot.alreadySaved).length;
     const duplicateText = duplicateCount ? `，其中 ${duplicateCount} 条命中已有快照未覆盖` : '';
     setEntryParallelMessage(`保存完成：${entryParallelSavedSnapshots.value.length} 条${duplicateText}。`, 'success');
-    await loadEntryParallelSaved(request.predictQiHao);
+    await loadEntryParallelSaved(requests[0].predictQiHao);
   } catch (error) {
     setEntryParallelMessage(`保存拟正式快照失败：${errorText(error)}`, 'error');
   } finally {
@@ -333,14 +335,41 @@ async function reviewEntryParallel(predictQiHao: string, snapshotIds: number[]) 
 }
 
 /**
+ * 串行执行拟正式预测小请求。
+ */
+async function runEntryParallelRequests(
+  requests: EntryParallelPredictionRequest[],
+  runner: (request: EntryParallelPredictionRequest) => Promise<EntryParallelPredictionSnapshot[]>,
+  actionName: string
+) {
+  const snapshots: EntryParallelPredictionSnapshot[] = [];
+  for (let index = 0; index < requests.length; index += 1) {
+    const request = requests[index];
+    setEntryParallelMessage(
+      `${actionName}中：${index + 1}/${requests.length}，实验 ${request.experimentIds.join(',')}，Top${request.entrySize}...`,
+      'info'
+    );
+    const response = await runner(request);
+    snapshots.push(...(response ?? []));
+  }
+  return snapshots;
+}
+
+/**
  * 校验入口拟正式预测请求。
  */
-function validateEntryParallelRequest(request: EntryParallelPredictionRequest) {
-  if (!request.predictQiHao) {
+function validateEntryParallelRequests(requests: EntryParallelPredictionRequest[]) {
+  if (!requests.length) {
+    setEntryParallelMessage('请至少选择一个实验和一个入口规模。', 'error');
+    return false;
+  }
+  const invalidQiHao = requests.find((request) => !request.predictQiHao);
+  if (invalidQiHao) {
     setEntryParallelMessage('请先填写预测期号。', 'error');
     return false;
   }
-  if (!request.experimentIds.length) {
+  const invalidExperiment = requests.find((request) => !request.experimentIds.length);
+  if (invalidExperiment) {
     setEntryParallelMessage('当前没有可用于拟正式预测的已保存入口实验。', 'error');
     return false;
   }
@@ -411,10 +440,22 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-// 页面加载时只读取实验库，不自动触发昂贵的历史计算。
+// 页面加载时读取本地开奖缓存和实验库，不自动触发昂贵的历史计算。
 onMounted(() => {
-  void loadExperiments();
+  void initializePage();
 });
+
+/**
+ * 初始化入口研究页面。
+ */
+async function initializePage() {
+  try {
+    await lotteryStore.loadAllFromDB();
+  } catch (error) {
+    setMessage(`读取本地开奖缓存失败：${errorText(error)}`, 'error');
+  }
+  await loadExperiments();
+}
 </script>
 
 <style scoped>
