@@ -308,6 +308,8 @@ export interface EntryParallelPredictionSnapshot {
   id: number | null;                                   // 快照ID，预览时为空
   experimentId: number;                                // 来源入口实验ID
   experimentName: string;                              // 冗余实验名称
+  experimentLabelCn?: string | null;                   // 实验中文名称
+  experimentDescriptionCn?: string | null;             // 实验中文说明
   strategyCode: string;                                // 策略编码
   strategyVersion: string;                             // 策略版本
   modelVersion: string;                                // 拟正式预测模型版本
@@ -316,6 +318,7 @@ export interface EntryParallelPredictionSnapshot {
   redEntryPool: string[];                              // 红球入口池
   compressedRedPool: string[];                         // 压缩红球池，第一版可能为空
   nineRedPool: string[];                               // 9+1红球池，第一版可能为空
+  nineBlueNumber?: string | null;                      // 9+1蓝球，第一版可能为空
   singleTickets: Array<{ redNumbers: string[]; blueNumber?: string }>; // 10注6+1票面，第一版可能为空
   blueCandidates: string[];                            // 蓝球候选，第一版可能为空
   actualRedNumbers?: string[];                         // 已复盘实际红球
@@ -490,6 +493,7 @@ function normalizeParallelSnapshot(raw: unknown): EntryParallelPredictionSnapsho
     redEntryPool: stringArray(item.redEntryPool),
     compressedRedPool: stringArray(item.compressedRedPool ?? item.redCompressedPool),
     nineRedPool: stringArray(item.nineRedPool ?? item.ninePlusOneRed),
+    nineBlueNumber: stringValue(item.nineBlueNumber ?? item.ninePlusOneBlue),
     singleTickets: Array.isArray(item.singleTickets)
       ? item.singleTickets as Array<{ redNumbers: string[]; blueNumber?: string }>
       : [],

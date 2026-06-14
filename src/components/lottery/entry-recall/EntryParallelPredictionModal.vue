@@ -8,7 +8,7 @@
             <div>
               <h2 class="section-title">入口实验拟正式预测</h2>
               <p class="section-subtitle">
-                该弹窗独立观察已保存入口实验的拟正式输出；第一版仅生成入口池，不替代正式预测模型。
+                该弹窗独立观察已保存入口实验的拟正式输出；当前已生成入口池、压缩池、9+1、10注和蓝球候选，不替代正式预测模型。
               </p>
             </div>
             <button class="icon-button" @click="$emit('close')">关闭</button>
@@ -84,8 +84,11 @@
                   <td class="font-bold text-text-primary">{{ snapshot.id ?? '预览' }}</td>
                   <td>{{ snapshot.predictQiHao }}</td>
                   <td class="name-cell">
-                    <div class="experiment-title">{{ snapshot.experimentName || `实验 ${snapshot.experimentId}` }}</div>
+                    <div class="experiment-title">{{ snapshot.experimentLabelCn || snapshot.experimentName || `实验 ${snapshot.experimentId}` }}</div>
                     <div class="experiment-description">实验ID：{{ snapshot.experimentId }} / Top{{ snapshot.entrySize }}</div>
+                    <div v-if="snapshot.experimentDescriptionCn" class="experiment-description">
+                      {{ snapshot.experimentDescriptionCn }}
+                    </div>
                   </td>
                   <td>
                     <div>{{ snapshot.strategyCode }}</div>
@@ -101,6 +104,12 @@
                   </td>
                   <td class="pool-cell">
                     <NumberPoolText :numbers="snapshot.nineRedPool" :actual-red-numbers="snapshot.actualRedNumbers" empty-text="未生成" />
+                    <div class="hit-line">
+                      蓝球：
+                      <span :class="snapshot.nineBlueNumber && snapshot.nineBlueNumber === snapshot.actualBlueNumber ? 'hit-blue' : ''">
+                        {{ snapshot.nineBlueNumber || '未生成' }}
+                      </span>
+                    </div>
                     <div class="hit-line">命中：{{ countText(snapshot.nineHitCount) }}</div>
                   </td>
                   <td class="ticket-cell">
@@ -149,7 +158,7 @@
 <script setup lang="ts">
 /**
  * 已保存入口实验拟正式预测弹窗。
- * @description 第一版聚焦“入口池快照”，为后续压缩池、9+1和10注输出预留展示位置。
+ * @description 独立展示入口实验的入口池、压缩池、9+1、10注和复盘命中状态。
  */
 import { computed, defineComponent, h, ref, watch } from 'vue';
 import type {
