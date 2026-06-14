@@ -32,6 +32,21 @@
       @detail="loadDetail"
       @stability="loadStability"
       @compare="loadComparison"
+      @parallel-prediction="openEntryParallelPrediction"
+    />
+    <EntryParallelPredictionModal
+      :visible="entryParallelVisible"
+      :experiments="experiments"
+      :preview-snapshots="entryParallelPreviewSnapshots"
+      :saved-snapshots="entryParallelSavedSnapshots"
+      :loading="entryParallelLoading"
+      :message="entryParallelMessage"
+      :message-type="entryParallelMessageType"
+      @close="entryParallelVisible = false"
+      @preview="previewEntryParallel"
+      @save="saveEntryParallel"
+      @refresh-saved="loadEntryParallelSaved"
+      @review="reviewEntryParallel"
     />
     <EntryRecallStabilityPanel :result="stabilityResult" />
     <EntryRecallGridPanel :running="gridLoading" :result="gridResult" @preview="runGridPreview" />
@@ -49,16 +64,23 @@ import EntryRecallExperimentForm from '../components/lottery/entry-recall/EntryR
 import EntryRecallExperimentList from '../components/lottery/entry-recall/EntryRecallExperimentList.vue';
 import EntryRecallGridPanel from '../components/lottery/entry-recall/EntryRecallGridPanel.vue';
 import EntryRecallMetricTable from '../components/lottery/entry-recall/EntryRecallMetricTable.vue';
+import EntryParallelPredictionModal from '../components/lottery/entry-recall/EntryParallelPredictionModal.vue';
 import EntryRecallStabilityPanel from '../components/lottery/entry-recall/EntryRecallStabilityPanel.vue';
 import {
   compareEntryRecallExperiments,
   getEntryRecallExperimentDetail,
   getEntryRecallStability,
+  listEntryParallelPredictions,
   listEntryRecallExperiments,
+  previewEntryParallelPrediction,
   previewEntryRecallGrid,
+  reviewEntryParallelPredictions,
+  saveEntryParallelPrediction,
   runEntryRecallExperiment
 } from '../api/modules/entryRecall';
 import type {
+  EntryParallelPredictionRequest,
+  EntryParallelPredictionSnapshot,
   EntryRecallBaselineResult,
   EntryRecallEntrySizeMetric,
   EntryRecallExperimentBundle,
@@ -81,14 +103,24 @@ const comparisonBundles = ref<EntryRecallExperimentBundle[]>([]);
 const stabilityResult = ref<EntryRecallStabilityResult | null>(null);
 // 当前网格预览结果。
 const gridResult = ref<EntryRecallGridPreviewResult | null>(null);
+// 入口实验拟正式预测弹窗开关。
+const entryParallelVisible = ref(false);
+// 入口实验拟正式预测临时预览结果。
+const entryParallelPreviewSnapshots = ref<EntryParallelPredictionSnapshot[]>([]);
+// 入口实验拟正式预测已保存快照结果。
+const entryParallelSavedSnapshots = ref<EntryParallelPredictionSnapshot[]>([]);
 // 各接口加载状态。
 const running = ref(false);
 const listLoading = ref(false);
 const comparisonLoading = ref(false);
 const gridLoading = ref(false);
+const entryParallelLoading = ref(false);
 // 页面提示。
 const message = ref('');
 const messageType = ref<'success' | 'error' | 'info'>('info');
+// 入口实验拟正式预测弹窗提示。
+const entryParallelMessage = ref('');
+const entryParallelMessageType = ref<'success' | 'error' | 'info'>('info');
 
 /**
  * 页面提示样式。
@@ -204,6 +236,118 @@ async function runGridPreview(request: EntryRecallGridPreviewRequest) {
 }
 
 /**
+ * 打开入口实验拟正式预测弹窗。
+ */
+function openEntryParallelPrediction() {
+  entryParallelVisible.value = true;
+  setEntryParallelMessage('请选择期号后刷新预测；第一版只保存入口池快照。', 'info');
+}
+
+/**
+ * 预览入口实验拟正式预测，不落库。
+ */
+async function previewEntryParallel(request: EntryParallelPredictionRequest) {
+  if (!validateEntryParallelRequest(request)) {
+    return;
+  }
+  entryParallelLoading.value = true;
+  setEntryParallelMessage('正在刷新入口实验拟正式预测...', 'info');
+  try {
+    const response = await previewEntryParallelPrediction(request);
+    entryParallelPreviewSnapshots.value = response ?? [];
+    setEntryParallelMessage(`预览完成：${entryParallelPreviewSnapshots.value.length} 条，未落库。`, 'success');
+  } catch (error) {
+    setEntryParallelMessage(`刷新拟正式预测失败：${errorText(error)}`, 'error');
+  } finally {
+    entryParallelLoading.value = false;
+  }
+}
+
+/**
+ * 保存入口实验拟正式预测快照，保存后重新读取该期已保存数据。
+ */
+async function saveEntryParallel(request: EntryParallelPredictionRequest) {
+  if (!validateEntryParallelRequest(request)) {
+    return;
+  }
+  entryParallelLoading.value = true;
+  setEntryParallelMessage('正在保存入口实验拟正式预测快照...', 'info');
+  try {
+    const response = await saveEntryParallelPrediction(request);
+    entryParallelSavedSnapshots.value = response ?? [];
+    const duplicateCount = entryParallelSavedSnapshots.value.filter((snapshot) => snapshot.alreadySaved).length;
+    const duplicateText = duplicateCount ? `，其中 ${duplicateCount} 条命中已有快照未覆盖` : '';
+    setEntryParallelMessage(`保存完成：${entryParallelSavedSnapshots.value.length} 条${duplicateText}。`, 'success');
+    await loadEntryParallelSaved(request.predictQiHao);
+  } catch (error) {
+    setEntryParallelMessage(`保存拟正式快照失败：${errorText(error)}`, 'error');
+  } finally {
+    entryParallelLoading.value = false;
+  }
+}
+
+/**
+ * 读取指定期号的已保存入口拟正式快照。
+ */
+async function loadEntryParallelSaved(predictQiHao: string) {
+  if (!predictQiHao) {
+    setEntryParallelMessage('请先填写预测期号。', 'error');
+    return;
+  }
+  entryParallelLoading.value = true;
+  setEntryParallelMessage(`正在读取 ${predictQiHao} 已保存拟正式快照...`, 'info');
+  try {
+    const response = await listEntryParallelPredictions(predictQiHao);
+    entryParallelSavedSnapshots.value = response ?? [];
+    setEntryParallelMessage(`已读取 ${entryParallelSavedSnapshots.value.length} 条已保存拟正式快照。`, 'success');
+  } catch (error) {
+    setEntryParallelMessage(`读取已保存拟正式快照失败：${errorText(error)}`, 'error');
+  } finally {
+    entryParallelLoading.value = false;
+  }
+}
+
+/**
+ * 对已保存入口拟正式快照执行复盘并保存诊断包。
+ */
+async function reviewEntryParallel(predictQiHao: string, snapshotIds: number[]) {
+  if (!predictQiHao) {
+    setEntryParallelMessage('请先填写预测期号。', 'error');
+    return;
+  }
+  if (!snapshotIds.length) {
+    setEntryParallelMessage('当前期号没有可复盘的已保存快照。', 'error');
+    return;
+  }
+  entryParallelLoading.value = true;
+  setEntryParallelMessage(`正在复盘 ${predictQiHao} 的入口拟正式快照...`, 'info');
+  try {
+    const response = await reviewEntryParallelPredictions({ predictQiHao, snapshotIds });
+    entryParallelSavedSnapshots.value = response ?? [];
+    setEntryParallelMessage(`复盘完成：${entryParallelSavedSnapshots.value.length} 条，已保存诊断包。`, 'success');
+  } catch (error) {
+    setEntryParallelMessage(`复盘拟正式快照失败：${errorText(error)}`, 'error');
+  } finally {
+    entryParallelLoading.value = false;
+  }
+}
+
+/**
+ * 校验入口拟正式预测请求。
+ */
+function validateEntryParallelRequest(request: EntryParallelPredictionRequest) {
+  if (!request.predictQiHao) {
+    setEntryParallelMessage('请先填写预测期号。', 'error');
+    return false;
+  }
+  if (!request.experimentIds.length) {
+    setEntryParallelMessage('当前没有可用于拟正式预测的已保存入口实验。', 'error');
+    return false;
+  }
+  return true;
+}
+
+/**
  * 从已保存实验摘要恢复统一指标展示。
  */
 function baselineFromBundle(bundle: EntryRecallExperimentBundle): EntryRecallBaselineResult {
@@ -250,6 +394,14 @@ function safeJsonObject(value: string) {
 function setMessage(text: string, type: 'success' | 'error' | 'info') {
   message.value = text;
   messageType.value = type;
+}
+
+/**
+ * 设置入口拟正式预测弹窗提示。
+ */
+function setEntryParallelMessage(text: string, type: 'success' | 'error' | 'info') {
+  entryParallelMessage.value = text;
+  entryParallelMessageType.value = type;
 }
 
 /**

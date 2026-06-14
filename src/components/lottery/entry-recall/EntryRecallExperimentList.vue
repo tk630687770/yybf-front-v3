@@ -10,6 +10,9 @@
         <button class="action-button" :disabled="loading" @click="$emit('refresh')">
           {{ loading ? '读取中...' : '刷新实验库' }}
         </button>
+        <button class="action-button action-button-primary" :disabled="!experiments.length" @click="$emit('parallelPrediction')">
+          查看预测
+        </button>
         <button class="action-button action-button-primary" :disabled="selectedIds.length < 2 || comparing" @click="emitCompare">
           {{ comparing ? '对比读取中...' : `对比已选 ${selectedIds.length} 项` }}
         </button>
@@ -143,6 +146,7 @@ const emit = defineEmits<{
   detail: [experimentId: number];
   stability: [experimentId: number];
   compare: [experimentIds: number[]];
+  parallelPrediction: [];
 }>();
 
 // 当前准备横向对比的正式实验ID。

@@ -285,6 +285,55 @@ export interface EntryRecallGridPreviewResult {
 }
 
 /**
+ * 入口实验拟正式预测快照请求。
+ */
+export interface EntryParallelPredictionRequest {
+  predictQiHao: string;                                // 预测期号
+  experimentIds: number[];                             // 参与拟正式预测的实验ID
+  entrySize: number;                                   // 读取的入口规模
+}
+
+/**
+ * 入口实验拟正式预测复盘请求。
+ */
+export interface EntryParallelPredictionReviewRequest {
+  predictQiHao: string;                                // 需要复盘的预测期号
+  snapshotIds?: number[];                              // 指定快照ID；为空时复盘该期全部快照
+}
+
+/**
+ * 入口实验拟正式预测快照结果。
+ */
+export interface EntryParallelPredictionSnapshot {
+  id: number | null;                                   // 快照ID，预览时为空
+  experimentId: number;                                // 来源入口实验ID
+  experimentName: string;                              // 冗余实验名称
+  strategyCode: string;                                // 策略编码
+  strategyVersion: string;                             // 策略版本
+  modelVersion: string;                                // 拟正式预测模型版本
+  predictQiHao: string;                                // 预测期号
+  entrySize: number;                                   // 入口规模
+  redEntryPool: string[];                              // 红球入口池
+  compressedRedPool: string[];                         // 压缩红球池，第一版可能为空
+  nineRedPool: string[];                               // 9+1红球池，第一版可能为空
+  singleTickets: Array<{ redNumbers: string[]; blueNumber?: string }>; // 10注6+1票面，第一版可能为空
+  blueCandidates: string[];                            // 蓝球候选，第一版可能为空
+  actualRedNumbers?: string[];                         // 已复盘实际红球
+  actualBlueNumber?: string | null;                    // 已复盘实际蓝球
+  entryHitCount?: number | null;                       // 入口池命中红球数量
+  compressedHitCount?: number | null;                  // 压缩池命中红球数量
+  nineHitCount?: number | null;                        // 9+1命中红球数量
+  singleTicketMaxHitCount?: number | null;             // 10注最高红球命中
+  reviewStatus?: number | null;                        // 0未复盘，1已复盘
+  diagnosticSaved?: number | null;                     // 0未保存诊断，1已保存诊断
+  diagnosticJson?: string | null;                      // 诊断JSON
+  createdAt?: string | null;                           // 保存时间
+  reviewTime?: string | null;                          // 复盘时间
+  alreadySaved?: boolean;                              // 保存时是否命中已有快照
+  note?: string | null;                                // 服务端说明
+}
+
+/**
  * 运行入口召回预览或正式实验。
  */
 export async function runEntryRecallExperiment(
@@ -349,4 +398,125 @@ export async function previewEntryRecallGrid(
   return request.post('/ssq/window/axis/replay/entry-recall/grid-preview', params, {
     timeout: 300000
   });
+}
+
+/**
+ * 预览入口实验拟正式预测快照，不落库。
+ */
+export async function previewEntryParallelPrediction(
+  params: EntryParallelPredictionRequest
+): Promise<EntryParallelPredictionSnapshot[]> {
+  const response = await request.post('/ssq/window/axis/replay/entry-recall/parallel-prediction/preview', params, {
+    timeout: 300000
+  });
+  return normalizeParallelSnapshots(response);
+}
+
+/**
+ * 保存入口实验拟正式预测快照；同指纹命中已有记录时不覆盖。
+ */
+export async function saveEntryParallelPrediction(
+  params: EntryParallelPredictionRequest
+): Promise<EntryParallelPredictionSnapshot[]> {
+  const response = await request.post('/ssq/window/axis/replay/entry-recall/parallel-prediction/save', params, {
+    timeout: 300000
+  });
+  return normalizeParallelSnapshots(response);
+}
+
+/**
+ * 查询指定期号的入口实验拟正式预测快照。
+ */
+export async function listEntryParallelPredictions(
+  predictQiHao: string
+): Promise<EntryParallelPredictionSnapshot[]> {
+  const response = await request.get('/ssq/window/axis/replay/entry-recall/parallel-prediction/list', {
+    params: { predictQiHao }
+  });
+  return normalizeParallelSnapshots(response);
+}
+
+/**
+ * 对已保存入口实验拟正式预测快照执行复盘并保存诊断。
+ */
+export async function reviewEntryParallelPredictions(
+  params: EntryParallelPredictionReviewRequest
+): Promise<EntryParallelPredictionSnapshot[]> {
+  const response = await request.post('/ssq/window/axis/replay/entry-recall/parallel-prediction/review-and-save-diagnostic', params, {
+    timeout: 300000
+  });
+  return normalizeParallelSnapshots(response);
+}
+
+/**
+ * 兼容后端原始数组返回和通用包装返回。
+ */
+function normalizeParallelSnapshots(response: unknown): EntryParallelPredictionSnapshot[] {
+  const payload = unwrapParallelResponse(response);
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  return payload.map(normalizeParallelSnapshot);
+}
+
+/**
+ * 兼容通用响应包装，并在后端返回业务错误时抛出可读错误。
+ */
+function unwrapParallelResponse(response: unknown): unknown {
+  if (Array.isArray(response)) {
+    return response;
+  }
+  if (response && typeof response === 'object' && Array.isArray((response as { data?: unknown }).data)) {
+    return (response as { data: unknown[] }).data;
+  }
+  if (response && typeof response === 'object' && 'code' in response) {
+    const wrapped = response as { code?: number; msg?: string; data?: unknown };
+    if (wrapped.code !== 200 && wrapped.code !== 0) {
+      throw new Error(wrapped.msg || `接口返回异常：${wrapped.code}`);
+    }
+    return wrapped.data;
+  }
+  return response;
+}
+
+/**
+ * 将后端别名字段统一为页面展示字段。
+ */
+function normalizeParallelSnapshot(raw: unknown): EntryParallelPredictionSnapshot {
+  const item = raw as Record<string, unknown>;
+  return {
+    ...(item as unknown as EntryParallelPredictionSnapshot),
+    experimentId: numberValue(item.experimentId ?? item.sourceExperimentId),
+    redEntryPool: stringArray(item.redEntryPool),
+    compressedRedPool: stringArray(item.compressedRedPool ?? item.redCompressedPool),
+    nineRedPool: stringArray(item.nineRedPool ?? item.ninePlusOneRed),
+    singleTickets: Array.isArray(item.singleTickets)
+      ? item.singleTickets as Array<{ redNumbers: string[]; blueNumber?: string }>
+      : [],
+    blueCandidates: stringArray(item.blueCandidates),
+    actualRedNumbers: stringArray(item.actualRedNumbers),
+    actualBlueNumber: stringValue(item.actualBlueNumber),
+    singleTicketMaxHitCount: numberValue(item.singleTicketMaxHitCount ?? item.singleBestRedHitCount)
+  };
+}
+
+/**
+ * 安全转换字符串数组。
+ */
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+/**
+ * 安全转换数字。
+ */
+function numberValue(value: unknown): number {
+  return typeof value === 'number' ? value : Number(value || 0);
+}
+
+/**
+ * 安全转换可空字符串。
+ */
+function stringValue(value: unknown): string | null {
+  return value == null ? null : String(value);
 }
