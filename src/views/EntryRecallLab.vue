@@ -31,6 +31,7 @@
       @refresh="loadExperiments"
       @detail="loadDetail"
       @stability="loadStability"
+      @random-evaluation="loadRandomEvaluation"
       @compare="loadComparison"
       @parallel-prediction="openEntryParallelPrediction"
     />
@@ -50,6 +51,7 @@
       @review="reviewEntryParallel"
     />
     <EntryRecallStabilityPanel :result="stabilityResult" />
+    <EntryRecallRandomEvaluationPanel :result="randomEvaluationResult" />
     <EntryRecallGridPanel :running="gridLoading" :result="gridResult" @preview="runGridPreview" />
   </div>
 </template>
@@ -67,10 +69,12 @@ import EntryRecallGridPanel from '../components/lottery/entry-recall/EntryRecall
 import EntryRecallMetricTable from '../components/lottery/entry-recall/EntryRecallMetricTable.vue';
 import EntryParallelPredictionModal from '../components/lottery/entry-recall/EntryParallelPredictionModal.vue';
 import EntryRecallStabilityPanel from '../components/lottery/entry-recall/EntryRecallStabilityPanel.vue';
+import EntryRecallRandomEvaluationPanel from '../components/lottery/entry-recall/EntryRecallRandomEvaluationPanel.vue';
 import { useLotteryStore } from '@/stores/lottery';
 import {
   compareEntryRecallExperiments,
   getEntryRecallExperimentDetail,
+  getEntryRecallRandomEvaluation,
   getEntryRecallStability,
   listEntryParallelPredictions,
   listEntryRecallExperiments,
@@ -90,6 +94,7 @@ import type {
   EntryRecallExperimentRequest,
   EntryRecallGridPreviewRequest,
   EntryRecallGridPreviewResult,
+  EntryRecallRandomEvaluationResult,
   EntryRecallStabilityResult
 } from '../api/modules/entryRecall';
 
@@ -103,6 +108,8 @@ const experiments = ref<EntryRecallExperimentEntity[]>([]);
 const comparisonBundles = ref<EntryRecallExperimentBundle[]>([]);
 // 当前稳定性结果。
 const stabilityResult = ref<EntryRecallStabilityResult | null>(null);
+// 当前随机基线评价结果。
+const randomEvaluationResult = ref<EntryRecallRandomEvaluationResult | null>(null);
 // 当前网格预览结果。
 const gridResult = ref<EntryRecallGridPreviewResult | null>(null);
 // 入口实验拟正式预测弹窗开关。
@@ -219,6 +226,19 @@ async function loadStability(experimentId: number) {
     setMessage(`已读取入口实验 ${experimentId} 的时间切片稳定性。`, 'success');
   } catch (error) {
     setMessage(`读取时间切片稳定性失败：${errorText(error)}`, 'error');
+  }
+}
+
+/**
+ * 读取已保存实验相对随机基线的评价结果。
+ */
+async function loadRandomEvaluation(experimentId: number) {
+  setMessage(`正在读取入口实验 ${experimentId} 的随机基线评价...`, 'info');
+  try {
+    randomEvaluationResult.value = await getEntryRecallRandomEvaluation(experimentId);
+    setMessage(`已读取入口实验 ${experimentId} 的随机基线评价。`, 'success');
+  } catch (error) {
+    setMessage(`读取随机基线评价失败：${errorText(error)}`, 'error');
   }
 }
 

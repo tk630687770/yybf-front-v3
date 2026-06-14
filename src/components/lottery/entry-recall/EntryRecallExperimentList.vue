@@ -68,6 +68,7 @@
           <td>
             <button class="table-button" @click="$emit('detail', experiment.id)">详情</button>
             <button class="table-button table-button-secondary" @click="$emit('stability', experiment.id)">稳定性</button>
+            <button class="table-button table-button-secondary" @click="$emit('randomEvaluation', experiment.id)">随机评价</button>
           </td>
         </tr>
         <tr v-if="!experiments.length">
@@ -148,6 +149,7 @@ const emit = defineEmits<{
   refresh: [];
   detail: [experimentId: number];
   stability: [experimentId: number];
+  randomEvaluation: [experimentId: number];
   compare: [experimentIds: number[]];
   parallelPrediction: [];
 }>();

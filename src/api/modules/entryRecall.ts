@@ -285,6 +285,42 @@ export interface EntryRecallGridPreviewResult {
 }
 
 /**
+ * 单个入口规模相对随机基线的评价指标。
+ */
+export interface EntryRecallRandomEvaluationMetric {
+  entrySize: number;                                  // 入口规模
+  actualAverageHit: number;                           // 实验实际平均命中
+  randomAverageHit: number;                           // 同规模随机平均命中
+  averageHitDelta: number;                            // 实际均值减随机均值
+  averageHitLift: number;                             // 实际均值相对随机倍数
+  actualZeroToTwoRate: number;                        // 实际0至2红比例
+  randomZeroToTwoRate: number;                        // 随机0至2红比例
+  zeroToTwoReduction: number;                         // 低命中风险下降幅度
+  actualAtLeastFourRate: number;                      // 实际至少4红比例
+  randomAtLeastFourRate: number;                      // 随机至少4红比例
+  atLeastFourLift: number;                            // 至少4红提升倍数
+  actualAtLeastFiveRate: number;                      // 实际至少5红比例
+  randomAtLeastFiveRate: number;                      // 随机至少5红比例
+  atLeastFiveLift: number;                            // 至少5红提升倍数
+  actualAllSixRate: number;                           // 实际完整6红比例
+  randomAllSixRate: number;                           // 随机完整6红比例
+  allSixLift: number;                                 // 完整6红提升倍数
+  conclusion: string;                                 // 单规模简短结论
+}
+
+/**
+ * 已保存入口实验相对随机基线的评价结果。
+ */
+export interface EntryRecallRandomEvaluationResult {
+  experimentId: number;                               // 实验ID
+  experimentName: string;                             // 实验原始名称
+  experimentLabelCn: string | null;                   // 实验中文名称
+  strategyCode: string;                               // 策略编码
+  strategyVersion: string;                            // 策略版本
+  metrics: EntryRecallRandomEvaluationMetric[];       // 各入口规模评价
+}
+
+/**
  * 入口实验拟正式预测快照请求。
  */
 export interface EntryParallelPredictionRequest {
@@ -404,6 +440,18 @@ export async function previewEntryRecallGrid(
 }
 
 /**
+ * 读取已保存入口实验相对随机基线的评价结果。
+ */
+export async function getEntryRecallRandomEvaluation(
+  experimentId: number
+): Promise<EntryRecallRandomEvaluationResult> {
+  const response = await request.get('/ssq/window/axis/replay/entry-recall/random-baseline/evaluate', {
+    params: { experimentId }
+  });
+  return normalizeRandomEvaluation(response);
+}
+
+/**
  * 预览入口实验拟正式预测快照，不落库。
  */
 export async function previewEntryParallelPrediction(
@@ -480,6 +528,16 @@ function unwrapParallelResponse(response: unknown): unknown {
     return wrapped.data;
   }
   return response;
+}
+
+/**
+ * 兼容后端通用包装返回，提取随机基线评价业务数据。
+ */
+function normalizeRandomEvaluation(response: unknown): EntryRecallRandomEvaluationResult {
+  if (response && typeof response === 'object' && 'data' in response) {
+    return (response as { data: EntryRecallRandomEvaluationResult }).data;
+  }
+  return response as EntryRecallRandomEvaluationResult;
 }
 
 /**
