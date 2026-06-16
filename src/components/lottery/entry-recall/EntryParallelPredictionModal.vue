@@ -111,16 +111,36 @@
                   <th>期号</th>
                   <th>实验</th>
                   <th>策略<br />版本</th>
-                  <th>入口池</th>
-                  <th>压缩池</th>
-                  <th>9+1</th>
-                  <th>10注6+1</th>
-                  <th>蓝球</th>
+                  <th>
+                    <button class="sortable-header" type="button" @click="toggleSort('entry')">
+                      入口池 <span>{{ sortIndicator('entry') }}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button class="sortable-header" type="button" @click="toggleSort('compressed')">
+                      压缩池 <span>{{ sortIndicator('compressed') }}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button class="sortable-header" type="button" @click="toggleSort('nine')">
+                      9+1 <span>{{ sortIndicator('nine') }}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button class="sortable-header" type="button" @click="toggleSort('single')">
+                      10注6+1 <span>{{ sortIndicator('single') }}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button class="sortable-header" type="button" @click="toggleSort('blue')">
+                      蓝球 <span>{{ sortIndicator('blue') }}</span>
+                    </button>
+                  </th>
                   <th>状态</th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr v-for="snapshot in displaySnapshots" :key="snapshotKey(snapshot)">
+                <tr v-for="snapshot in sortedDisplaySnapshots" :key="snapshotKey(snapshot)">
                   <td class="font-bold text-text-primary">{{ snapshot.id ?? '预览' }}</td>
                   <td>{{ snapshot.predictQiHao }}</td>
                   <td class="name-cell">
@@ -178,11 +198,10 @@
                     <span :class="statusClass(snapshot)">
                       {{ statusText(snapshot) }}
                     </span>
-                    <div v-if="snapshot.alreadySaved" class="hit-line">已存在，未覆盖</div>
-                    <div v-if="snapshot.note" class="hit-line">{{ snapshot.note }}</div>
+                    <div v-if="snapshot.alreadySaved" class="hit-line">已存在</div>
                   </td>
                 </tr>
-                <tr v-if="!displaySnapshots.length">
+                <tr v-if="!sortedDisplaySnapshots.length">
                   <td colspan="10" class="text-center py-5">暂无拟正式预测数据，请先刷新预测或读取已保存快照。</td>
                 </tr>
                 </tbody>
@@ -236,6 +255,10 @@ const localQiHao = ref('');
 const selectedEntrySizeTexts = ref<string[]>(['18']);
 // 当前弹窗选择的实验ID，多选后会和入口规模做笛卡尔组合。
 const selectedExperimentIdTexts = ref<string[]>([]);
+// 当前表格排序字段，默认保持接口返回顺序。
+const sortKey = ref<SortKey>('none');
+// 当前表格排序方向，命中数默认由高到低。
+const sortDirection = ref<SortDirection>('desc');
 
 /**
  * 弹窗打开或实验列表变化时，为期号、入口规模和实验列表提供可用默认值。
@@ -266,6 +289,23 @@ watch(
  */
 const displaySnapshots = computed(() => {
   return props.savedSnapshots.length ? props.savedSnapshots : props.previewSnapshots;
+});
+
+/**
+ * 根据表头点击状态排序展示结果。
+ */
+const sortedDisplaySnapshots = computed(() => {
+  const snapshots = [...displaySnapshots.value];
+  if (sortKey.value === 'none') {
+    return snapshots;
+  }
+  return snapshots.sort((left, right) => {
+    const delta = sortValue(right, sortKey.value) - sortValue(left, sortKey.value);
+    if (delta !== 0) {
+      return sortDirection.value === 'desc' ? delta : -delta;
+    }
+    return snapshotStableOrder(left).localeCompare(snapshotStableOrder(right));
+  });
 });
 
 /**
@@ -563,6 +603,73 @@ function statusClass(snapshot: EntryParallelPredictionSnapshot) {
   return snapshot.id == null ? 'status-badge status-preview' : 'status-badge status-waiting';
 }
 
+type SortKey = 'none' | 'entry' | 'compressed' | 'nine' | 'single' | 'blue';
+type SortDirection = 'asc' | 'desc';
+
+/**
+ * 切换表格排序字段；重复点击同一字段会在升序和降序之间切换。
+ */
+function toggleSort(nextKey: SortKey) {
+  if (sortKey.value === nextKey) {
+    sortDirection.value = sortDirection.value === 'desc' ? 'asc' : 'desc';
+    return;
+  }
+  sortKey.value = nextKey;
+  sortDirection.value = 'desc';
+}
+
+/**
+ * 表头排序提示。
+ */
+function sortIndicator(targetKey: SortKey) {
+  if (sortKey.value !== targetKey) {
+    return '↕';
+  }
+  return sortDirection.value === 'desc' ? '↓' : '↑';
+}
+
+/**
+ * 将不同列转换为可排序数值；未复盘的空值按-1处理，避免排在命中结果前面。
+ */
+function sortValue(snapshot: EntryParallelPredictionSnapshot, key: SortKey) {
+  if (key === 'entry') {
+    return snapshot.entryHitCount ?? -1;
+  }
+  if (key === 'compressed') {
+    return snapshot.compressedHitCount ?? -1;
+  }
+  if (key === 'nine') {
+    return snapshot.nineHitCount ?? -1;
+  }
+  if (key === 'single') {
+    return snapshot.singleTicketMaxHitCount ?? -1;
+  }
+  if (key === 'blue') {
+    return blueHitValue(snapshot);
+  }
+  return 0;
+}
+
+/**
+ * 蓝球排序：命中蓝球排在未命中前；未开奖或无蓝球时按-1处理。
+ */
+function blueHitValue(snapshot: EntryParallelPredictionSnapshot) {
+  if (!snapshot.actualBlueNumber) {
+    return -1;
+  }
+  const candidatesHit = snapshot.blueCandidates.includes(snapshot.actualBlueNumber) ? 1 : 0;
+  const nineHit = snapshot.nineBlueNumber === snapshot.actualBlueNumber ? 1 : 0;
+  const ticketHit = snapshot.singleTickets.some((ticket) => ticket.blueNumber === snapshot.actualBlueNumber) ? 1 : 0;
+  return Math.max(candidatesHit, nineHit, ticketHit);
+}
+
+/**
+ * 排序分数相同时使用稳定字段，避免表格跳动。
+ */
+function snapshotStableOrder(snapshot: EntryParallelPredictionSnapshot) {
+  return `${snapshot.predictQiHao}-${snapshot.experimentId}-${snapshot.entrySize}-${snapshot.id ?? 0}`;
+}
+
 /**
  * 简易号码池染色组件。
  */
@@ -785,6 +892,23 @@ const NumberPoolText = defineComponent({
   white-space: nowrap;
   color: var(--color-text-primary);
   background: rgba(22, 33, 62, 0.96);
+}
+
+.sortable-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sortable-header:hover {
+  color: var(--color-accent);
 }
 
 .result-table td {
