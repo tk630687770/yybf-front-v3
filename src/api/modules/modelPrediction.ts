@@ -82,6 +82,63 @@ export interface BlueCandidateDiagnosisResult {
 }
 
 /**
+ * 成本出票线策略汇总指标。
+ */
+export interface CostTicketStrategyMetric {
+  strategyCode: string;                 // 策略编码
+  strategyNameCn: string;               // 中文策略名称
+  sourceType: string;                   // 来源类型
+  periodCount: number;                  // 参与样本数
+  totalCost: number;                    // 总成本
+  totalPrize: number;                   // 总奖金
+  netAmount: number;                    // 净收益
+  averageCost: number;                  // 平均成本
+  averagePrize: number;                 // 平均奖金
+  averageNet: number;                   // 平均净收益
+  bestRedHitAverage: number;            // 最高红球命中均值
+  blueHitRate: number;                  // 蓝球命中率
+  winPeriodCount: number;               // 有奖样本数
+  maxSinglePeriodLoss: number;          // 单样本最大亏损
+  maxSinglePeriodPrize: number;         // 单样本最高奖金
+  maxLossStreak: number;                // 最大连续亏损样本数
+}
+
+/**
+ * 成本出票线逐期策略明细。
+ */
+export interface CostTicketPeriodRow {
+  predictQiHao: string;                 // 预测期号
+  strategyCode: string;                 // 策略编码
+  sourceSnapshotId: number | null;      // 正式快照ID
+  sourceExperimentId: number | null;    // 入口实验ID
+  entrySize: number | null;             // 入口规模
+  ticketCount: number;                  // 票面注数
+  costAmount: number;                   // 成本
+  prizeAmount: number;                  // 奖金
+  netAmount: number;                    // 净收益
+  bestRedHitCount: number;              // 最高红球命中数
+  blueHit: boolean;                     // 是否命中蓝球
+  bestPrizeLevel: string;               // 最高奖级
+  variablePrizeHit: boolean;            // 是否命中浮动奖
+  actualTicketText: string;             // 实际开奖
+  evidenceNote: string;                 // 证据说明
+}
+
+/**
+ * 成本出票线只读评审结果。
+ */
+export interface CostTicketReviewResult {
+  periodCount: number;                                  // 参与评审期数
+  formalSnapshotCount: number;                          // 正式快照数量
+  entrySnapshotCount: number;                           // 入口拟正式快照数量
+  reviewedEntrySnapshotCount: number;                   // 已复盘入口快照数量
+  strategyMetrics: CostTicketStrategyMetric[];          // 策略汇总指标
+  periodRows: CostTicketPeriodRow[];                    // 逐期策略明细
+  warnings: string[];                                   // 风险提示
+  conclusion: string;                                   // 总结
+}
+
+/**
  * 红蓝合并票面结果
  */
 export interface MultiWindowFinalTicket {
@@ -1176,6 +1233,19 @@ export async function getBlueCandidateDiagnosis(
       recentLimit,
       topLimit: 5
     }
+  });
+}
+
+/**
+ * 获取成本出票线只读评审结果。
+ * @param recentLimit 最近评审期数
+ * @returns 不同出票方式的成本、收益和风险对照
+ */
+export async function getCostTicketReview(
+  recentLimit = 20
+): Promise<ApiResponse<CostTicketReviewResult>> {
+  return request.get('/ssq/window/axis/replay/entry-recall/cost-ticket-review/evaluate', {
+    params: { recentLimit }
   });
 }
 

@@ -178,6 +178,13 @@
             >
               {{ blueDiagnosisLoading ? '诊断中...' : blueCandidateDiagnosis ? '关闭蓝球诊断' : '蓝球独立诊断' }}
             </button>
+            <button
+              :disabled="costTicketReviewLoading"
+              :class="['action-button', { 'action-button-active': costTicketReview }]"
+              @click="toggleCostTicketReview"
+            >
+              {{ costTicketReviewLoading ? '评审中...' : costTicketReview ? '关闭成本出票线' : '成本出票线' }}
+            </button>
           </div>
         </div>
       </div>
@@ -306,6 +313,159 @@
         准入纪律：任何观察策略要进入正式预测，至少需要6-7期样本；覆盖率必须提升，压缩后不能明显回落；
         蓝球不能继续拖后腿；并且必须先写入策略决策记录，再升级模型版本。
       </div>
+    </section>
+
+    <!-- 成本出票线：只读取已保存快照的成本事实，不改变预测和复盘证据 -->
+    <section v-if="isDiagnosticPage && costTicketReview" :class="diagnosticSectionClass('costTicketReview')">
+      <div class="diagnostic-section-header flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-text-primary">成本出票线只读评审</h2>
+          <p class="mt-1 text-xs text-text-secondary">
+            只对已保存且已复盘的正式快照、入口拟正式快照做成本事实对照，不代表购买建议。
+          </p>
+        </div>
+        <span class="text-xs text-text-secondary">
+          评审期数：{{ costTicketReview.periodCount }} / 正式快照：{{ costTicketReview.formalSnapshotCount }} / 入口快照：{{ costTicketReview.reviewedEntrySnapshotCount }}
+        </span>
+        <button class="collapse-button" @click="toggleDiagnosticSectionCollapse('costTicketReview')">
+          {{ diagnosticSectionCollapseText('costTicketReview') }}
+        </button>
+      </div>
+
+      <div class="mt-3 warning-box">
+        该模块只做已保存快照的成本事实对照，不代表购买建议。样本不足时只能观察成本风险，不能作为稳定策略结论。
+      </div>
+
+      <div v-if="costTicketReview.warnings.length" class="mt-3 warning-box">
+        <div v-for="warning in costTicketReview.warnings" :key="warning">- {{ warning }}</div>
+      </div>
+
+      <div class="mt-3 summary-grid">
+        <div class="summary-block">
+          <div class="summary-label">正式快照</div>
+          <div class="summary-value">{{ costTicketReview.formalSnapshotCount }} 条</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">入口拟正式快照</div>
+          <div class="summary-value">{{ costTicketReview.reviewedEntrySnapshotCount }} / {{ costTicketReview.entrySnapshotCount }} 条已复盘</div>
+        </div>
+        <div class="summary-block">
+          <div class="summary-label">当前结论</div>
+          <div class="summary-value text-xs leading-relaxed">{{ costTicketReview.conclusion }}</div>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('strategyNameCn')">
+                  策略 {{ costTicketSortMark('strategyNameCn') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('periodCount')">
+                  样本 {{ costTicketSortMark('periodCount') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('totalCost')">
+                  总成本 {{ costTicketSortMark('totalCost') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('totalPrize')">
+                  总奖金 {{ costTicketSortMark('totalPrize') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('netAmount')">
+                  净收益 {{ costTicketSortMark('netAmount') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('bestRedHitAverage')">
+                  最高红均值 {{ costTicketSortMark('bestRedHitAverage') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('blueHitRate')">
+                  蓝球命中 {{ costTicketSortMark('blueHitRate') }}
+                </button>
+              </th>
+              <th>
+                <button class="sortable-th" @click="setCostTicketSort('maxLossStreak')">
+                  最大连亏 {{ costTicketSortMark('maxLossStreak') }}
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="metric in sortedCostTicketMetrics" :key="metric.strategyCode">
+              <td>
+                <div class="font-bold text-text-primary">{{ metric.strategyNameCn }}</div>
+                <div class="mt-1 text-xs text-text-secondary">{{ metric.strategyCode }} / {{ metric.sourceType }}</div>
+              </td>
+              <td>{{ metric.periodCount }}</td>
+              <td>{{ metric.totalCost }}</td>
+              <td>{{ metric.totalPrize }}</td>
+              <td :class="metric.netAmount >= 0 ? 'text-green-400' : 'text-red-400'">{{ metric.netAmount }}</td>
+              <td>{{ formatNumber(metric.bestRedHitAverage, 2) }}</td>
+              <td>{{ formatPercent(metric.blueHitRate) }}</td>
+              <td>{{ metric.maxLossStreak }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="mt-4 diagnosis-collapse rounded-lg p-3">
+        <summary class="diagnosis-summary">
+          <div>
+            <h3 class="text-sm font-bold text-text-primary">逐期策略明细</h3>
+            <p class="mt-1 text-xs text-text-secondary">
+              默认折叠；用于追查某个策略在哪些期花费、中奖或连续亏损。
+            </p>
+          </div>
+          <span class="diagnosis-toggle-text">展开明细</span>
+        </summary>
+        <div class="mt-3 overflow-x-auto">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>期号</th>
+                <th>策略</th>
+                <th>来源</th>
+                <th>成本</th>
+                <th>奖金</th>
+                <th>净收益</th>
+                <th>最高红</th>
+                <th>蓝球</th>
+                <th>奖级</th>
+                <th>证据</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in costTicketReview.periodRows" :key="`${row.predictQiHao}-${row.strategyCode}-${row.sourceSnapshotId ?? 'entry'}-${row.sourceExperimentId ?? 'formal'}-${row.entrySize ?? 'none'}`">
+                <td>{{ row.predictQiHao }}</td>
+                <td>{{ costTicketStrategyName(row.strategyCode) }}</td>
+                <td>
+                  <div v-if="row.sourceSnapshotId">正式快照 {{ row.sourceSnapshotId }}</div>
+                  <div v-if="row.sourceExperimentId">入口实验 {{ row.sourceExperimentId }} / Top{{ row.entrySize }}</div>
+                  <div v-if="!row.sourceSnapshotId && !row.sourceExperimentId">基准</div>
+                </td>
+                <td>{{ row.costAmount }}</td>
+                <td>{{ row.prizeAmount }}</td>
+                <td :class="row.netAmount >= 0 ? 'text-green-400' : 'text-red-400'">{{ row.netAmount }}</td>
+                <td>{{ row.bestRedHitCount }}</td>
+                <td>{{ row.blueHit ? '命中' : '未中' }}</td>
+                <td>{{ row.bestPrizeLevel || '--' }}</td>
+                <td class="table-note">{{ row.evidenceNote }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
     </section>
 
     <SnapshotListPanel
@@ -2727,6 +2887,7 @@ import type { DrawRecord } from '@/types';
 import {
   diagnoseRedCandidateMiss,
   getBlueCandidateDiagnosis,
+  getCostTicketReview,
   getRedBayesColdHotDiagnosis,
   getRedCandidateGuardBacktest,
   getRedCandidateGuardCompressionBacktest,
@@ -2754,6 +2915,8 @@ import {
   syncDefaultAxisChains,
   syncRed10AxisChain,
   type BlueCandidateDiagnosisResult,
+  type CostTicketReviewResult,
+  type CostTicketStrategyMetric,
   type MultiWindowFinalPredictResult,
   type PredictionDiagnosticSnapshotEntity,
   type PredictionSnapshotEntity,
@@ -2800,6 +2963,7 @@ const guardCompressionGridLoading = ref(false);
 const guardCompressionRetentionGridLoading = ref(false);
 const bayesLoading = ref(false);
 const blueDiagnosisLoading = ref(false);
+const costTicketReviewLoading = ref(false);
 const diagnosticSnapshotLoading = ref(false);
 const drawLoading = ref(false);
 const axisSyncLoading = ref(false);
@@ -2832,6 +2996,7 @@ const guardCompressionRetentionGridBacktest = ref<RedCandidateGuardCompressionRe
 const activeGuardBacktestMode = ref<'basic' | 'quota'>('basic');
 const bayesDiagnosis = ref<RedBayesDiagnosisResult | null>(null);
 const blueCandidateDiagnosis = ref<BlueCandidateDiagnosisResult | null>(null);
+const costTicketReview = ref<CostTicketReviewResult | null>(null);
 const axisSyncResults = ref<WindowAxisChainResult[]>([]);
 const snapshots = ref<PredictionSnapshotEntity[]>([]);
 const activeDiagnosticSnapshots = ref<PredictionDiagnosticSnapshotEntity[]>([]);
@@ -2839,6 +3004,8 @@ const viewMode = ref<'realtime' | 'snapshot'>('realtime');
 const emptySourceContributionStats: RedCandidateGuardSourceContribution[] = [];
 const collapsedDiagnosticSections = ref<Set<string>>(new Set());
 const diagnosticPackSavedSnapshotId = ref<number | null>(null);
+const costTicketSortKey = ref<keyof CostTicketStrategyMetric>('netAmount');
+const costTicketSortDirection = ref<'asc' | 'desc'>('desc');
 
 type WorkflowStepStatus = 'done' | 'pending' | 'waiting' | 'unknown';
 
@@ -3108,6 +3275,20 @@ const currentPredictQiHao = computed(() => {
     return activeSnapshot.value?.predictQiHao ?? realtimePredictQiHao.value;
   }
   return realtimePredictQiHao.value || activeSnapshot.value?.predictQiHao || '';
+});
+
+const sortedCostTicketMetrics = computed(() => {
+  const rows = [...(costTicketReview.value?.strategyMetrics ?? [])];
+  const sortKey = costTicketSortKey.value;
+  const direction = costTicketSortDirection.value === 'asc' ? 1 : -1;
+  return rows.sort((left, right) => {
+    const leftValue = left[sortKey];
+    const rightValue = right[sortKey];
+    if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+      return (leftValue - rightValue) * direction;
+    }
+    return String(leftValue).localeCompare(String(rightValue), 'zh-CN') * direction;
+  });
 });
 
 /**
@@ -3563,6 +3744,16 @@ function formatPrize(review?: PredictionSnapshotTicketReview | null): string {
  */
 function formatPercent(value?: number | null): string {
   return typeof value === 'number' ? `${(value * 100).toFixed(2)}%` : '--';
+}
+
+/**
+ * 格式化普通数字。
+ * @param value 原始数字
+ * @param digits 小数位
+ * @returns 固定位数数字文本
+ */
+function formatNumber(value?: number | null, digits = 2): string {
+  return typeof value === 'number' ? value.toFixed(digits) : '--';
 }
 
 /**
@@ -4085,6 +4276,74 @@ async function toggleBlueCandidateDiagnosis() {
     return;
   }
   await loadBlueCandidateDiagnosis();
+}
+
+/**
+ * 设置成本出票线策略汇总表排序。
+ * @param key 排序字段
+ */
+function setCostTicketSort(key: keyof CostTicketStrategyMetric) {
+  if (costTicketSortKey.value === key) {
+    costTicketSortDirection.value = costTicketSortDirection.value === 'asc' ? 'desc' : 'asc';
+    return;
+  }
+  costTicketSortKey.value = key;
+  costTicketSortDirection.value = key === 'strategyNameCn' ? 'asc' : 'desc';
+}
+
+/**
+ * 获取成本出票线排序标记。
+ * @param key 表头字段
+ * @returns 当前排序箭头
+ */
+function costTicketSortMark(key: keyof CostTicketStrategyMetric) {
+  if (costTicketSortKey.value !== key) {
+    return '';
+  }
+  return costTicketSortDirection.value === 'asc' ? '↑' : '↓';
+}
+
+/**
+ * 获取成本出票线策略中文名。
+ * @param strategyCode 策略编码
+ * @returns 中文策略名，未知时回退为策略编码
+ */
+function costTicketStrategyName(strategyCode: string) {
+  return costTicketReview.value?.strategyMetrics.find(item => item.strategyCode === strategyCode)?.strategyNameCn
+    ?? strategyCode;
+}
+
+/**
+ * 加载成本出票线只读评审。
+ * @description 只读取已保存快照事实，不会重新生成预测，也不会修改正式预测或入口拟正式快照。
+ */
+async function loadCostTicketReview() {
+  costTicketReviewLoading.value = true;
+  message.value = '';
+  try {
+    const res = await getCostTicketReview(20);
+    if (res.code !== 200) {
+      throw new Error(res.msg || '成本出票线评审失败');
+    }
+    costTicketReview.value = res.data;
+    showMessage('成本出票线评审完成，当前只作为成本风险观察，不代表购买建议', 'success');
+  } catch (err: unknown) {
+    showMessage(err instanceof Error ? err.message : '成本出票线评审失败', 'error');
+  } finally {
+    costTicketReviewLoading.value = false;
+  }
+}
+
+/**
+ * 切换成本出票线只读评审区域。
+ */
+async function toggleCostTicketReview() {
+  if (costTicketReview.value) {
+    costTicketReview.value = null;
+    showMessage('已关闭成本出票线评审', 'success');
+    return;
+  }
+  await loadCostTicketReview();
 }
 
 /**
@@ -5550,6 +5809,18 @@ onMounted(async () => {
 .result-table th {
   color: var(--color-text-primary);
   background: rgba(22, 33, 62, 0.65);
+}
+
+.sortable-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
+.sortable-th:hover {
+  color: #93c5fd;
 }
 
 .result-table .table-note {
