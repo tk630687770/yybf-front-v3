@@ -20,6 +20,7 @@
       <div v-if="message" class="mt-3 text-xs" :class="messageClass">{{ message }}</div>
     </section>
 
+    <ForwardEvidenceStatusPanel />
     <EntryRecallExperimentForm :running="running" @run="runExperiment" />
     <EntryRecallMetricTable :baseline="activeBaseline" />
     <EntryRecallEvidencePanel :bundle="activeBundle" />
@@ -70,6 +71,7 @@ import EntryRecallMetricTable from '../components/lottery/entry-recall/EntryReca
 import EntryParallelPredictionModal from '../components/lottery/entry-recall/EntryParallelPredictionModal.vue';
 import EntryRecallStabilityPanel from '../components/lottery/entry-recall/EntryRecallStabilityPanel.vue';
 import EntryRecallRandomEvaluationPanel from '../components/lottery/entry-recall/EntryRecallRandomEvaluationPanel.vue';
+import ForwardEvidenceStatusPanel from '../components/lottery/entry-recall/ForwardEvidenceStatusPanel.vue';
 import { useLotteryStore } from '@/stores/lottery';
 import {
   compareEntryRecallExperiments,

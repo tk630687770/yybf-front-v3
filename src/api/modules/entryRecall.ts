@@ -338,6 +338,34 @@ export interface EntryParallelPredictionReviewRequest {
 }
 
 /**
+ * 单期前瞻证据状态。
+ */
+export interface ForwardEvidencePeriodStatus {
+  predictQiHao: string;                                // 预测期号
+  drawn: boolean;                                      // 是否已经开奖
+  formalSnapshotCount: number;                         // 正式预测快照数量
+  formalReviewedCount: number;                         // 已复盘正式预测快照数量
+  formalDiagnosticTypeCount: number;                   // 正式诊断类型数量
+  entrySnapshotCount: number;                          // 入口拟正式快照数量
+  entryReviewedCount: number;                          // 已复盘入口拟正式快照数量
+  entryDiagnosticCount: number;                        // 已保存诊断的入口快照数量
+  entryExperimentCount: number;                        // 入口实验数量
+  entrySizes: number[];                                // 已保存入口规模
+  statusCode: string;                                  // 机器可读状态编码
+  statusText: string;                                  // 中文状态
+  warnings: string[];                                  // 缺口和边界提示
+}
+
+/**
+ * 前瞻证据链只读状态。
+ */
+export interface ForwardEvidenceStatusResult {
+  latestDrawQiHao: string | null;                      // 最新开奖期号
+  nextPredictQiHao: string | null;                     // 当前待开奖预测期号
+  periods: ForwardEvidencePeriodStatus[];              // 待开奖期和最近已开奖期状态
+}
+
+/**
  * 入口实验拟正式预测快照结果。
  */
 export interface EntryParallelPredictionSnapshot {
@@ -497,6 +525,33 @@ export async function reviewEntryParallelPredictions(
     timeout: 300000
   });
   return normalizeParallelSnapshots(response);
+}
+
+/**
+ * 查询数据库中的前瞻证据链状态。
+ * 该接口只读，不触发同步、复盘、诊断保存或快照补造。
+ */
+export async function getForwardEvidenceStatus(
+  recentDrawLimit = 3
+): Promise<ForwardEvidenceStatusResult> {
+  const response = await request.get('/ssq/window/axis/replay/entry-recall/evidence-status', {
+    params: { recentDrawLimit }
+  });
+  return unwrapObjectResponse<ForwardEvidenceStatusResult>(response);
+}
+
+/**
+ * 兼容后端直接对象和通用响应包装。
+ */
+function unwrapObjectResponse<T>(response: unknown): T {
+  if (response && typeof response === 'object' && 'code' in response) {
+    const wrapped = response as { code?: number; msg?: string; data?: unknown };
+    if (wrapped.code !== 200 && wrapped.code !== 0) {
+      throw new Error(wrapped.msg || `接口返回异常：${wrapped.code}`);
+    }
+    return wrapped.data as T;
+  }
+  return response as T;
 }
 
 /**
