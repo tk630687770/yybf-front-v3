@@ -12,6 +12,7 @@ export interface BlueDecisionLevel {
   level: number;
   numbers: string[];
   willDownNumbers: string[];
+  hitNumbers: string[];
 }
 
 export interface BlueDecisionWindow {

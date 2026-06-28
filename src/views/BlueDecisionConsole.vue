@@ -38,6 +38,9 @@
               </div>
             </div>
           </div>
+          <button class="btn" :class="{ primary: showDrawBlue }" @click="showDrawBlue = !showDrawBlue">
+            {{ showDrawBlue ? '隐藏开奖' : '显示开奖' }}
+          </button>
           <button class="btn primary" :disabled="loading" @click="loadPrepare">读取窗口</button>
           <button class="btn" :disabled="loading || !prepare" @click="runScore">重新评分</button>
           <button class="btn danger" :disabled="loading" @click="clearTestData">删除测试数据</button>
@@ -60,9 +63,12 @@
                 v-for="number in level.numbers"
                 :key="number"
                 class="blue-pill"
-                :class="{ down: level.willDownNumbers.includes(number) }"
+                :class="{
+                  down: level.willDownNumbers.includes(number),
+                  hit: showDrawBlue && isHitBlue(level, number)
+                }"
               >
-                {{ number }}{{ level.willDownNumbers.includes(number) ? '↓' : '' }}
+                {{ number }}{{ level.willDownNumbers.includes(number) ? '↓' : '' }}{{ showDrawBlue && isHitBlue(level, number) ? '★' : '' }}
               </span>
             </div>
           </div>
@@ -303,6 +309,7 @@ const testData = ref(false);
 const loading = ref(false);
 const message = ref('');
 const messageType = ref<'ok' | 'error'>('ok');
+const showDrawBlue = ref(false);
 const prepare = ref<BlueDecisionPrepare | null>(null);
 const scoreResult = ref<BlueDecisionScore | null>(null);
 const selectedBlue = ref<string[]>([]);
@@ -399,6 +406,10 @@ function echoSnapshot(snapshot: BlueDecisionSnapshot) {
 
 function displayLevels(window: BlueDecisionWindow): BlueDecisionLevel[] {
   return [...window.levels].sort((a, b) => b.level - a.level);
+}
+
+function isHitBlue(level: BlueDecisionLevel, number: string) {
+  return (level.hitNumbers || []).includes(number);
 }
 
 function resetHistoryTabs() {
@@ -606,6 +617,12 @@ onMounted(async () => {
 
 .blue-pill.down {
   border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.blue-pill.hit {
+  background: var(--color-accent);
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .table-wrap {
