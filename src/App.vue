@@ -51,6 +51,13 @@
           >
             入口召回研究台
           </RouterLink>
+          <RouterLink
+            to="/blue-decision-console"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            蓝球决策台
+          </RouterLink>
         </nav>
       </div>
     </header>

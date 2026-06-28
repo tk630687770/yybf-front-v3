@@ -8,6 +8,7 @@ import WindowConsole from '../views/WindowConsole.vue';
 import ModelDashboard from '../views/ModelDashboard.vue';
 import HistoricalReplayLab from '../views/HistoricalReplayLab.vue';
 import EntryRecallLab from '../views/EntryRecallLab.vue';
+import BlueDecisionConsole from '../views/BlueDecisionConsole.vue';
 
 /**
  * 路由配置数组
@@ -53,6 +54,12 @@ const routes: RouteRecordRaw[] = [
     name: 'EntryRecallLab',                 // 红球入口召回研究台路由名称
     component: EntryRecallLab,              // 红球入口召回专项独立页面
     meta: { title: '红球入口召回研究台' }    // 页面标题
+  },
+  {
+    path: '/blue-decision-console',          // 蓝球决策台路径
+    name: 'BlueDecisionConsole',             // 蓝球决策台路由名称
+    component: BlueDecisionConsole,          // 蓝球窗口人工决策组件
+    meta: { title: '蓝球决策台' }            // 页面标题
   },
   {
     path: '/model-dashboard',          // 旧模型结果台路径
