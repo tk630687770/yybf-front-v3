@@ -71,17 +71,38 @@
     </section>
 
     <section v-if="prepare" class="decision-card">
-      <div>
-        <h2 class="font-bold">同状态历史完成统计</h2>
-        <p class="text-xs text-text-secondary">模糊匹配当前初始状态，切换标签查看不同最终升级状态的年度分布。</p>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="font-bold">同状态历史完成统计</h2>
+          <p class="text-xs text-text-secondary">模糊匹配当前初始状态，切换标签查看不同最终升级状态的年度分布。</p>
+        </div>
+        <button class="btn" @click="historyCollapsed = !historyCollapsed">
+          {{ historyCollapsed ? '展开' : '收起' }}
+        </button>
       </div>
-      <div class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
+      <div v-if="!historyCollapsed" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
         <div v-for="window in prepare.windows" :key="window.windowCode" class="history-card">
           <div class="flex items-center justify-between gap-2">
             <h3 class="font-bold">{{ window.windowName }}</h3>
-            <span class="text-xs text-text-secondary">当前：{{ historyStat(window.windowCode)?.currentState || '--' }}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-text-secondary">当前：{{ historyStat(window.windowCode)?.currentState || '--' }}</span>
+              <button
+                class="state-tab"
+                :class="{ active: historyMode[window.windowCode] !== 'all' }"
+                @click="setHistoryMode(window.windowCode, 'year')"
+              >
+                年度
+              </button>
+              <button
+                class="state-tab"
+                :class="{ active: historyMode[window.windowCode] === 'all' }"
+                @click="setHistoryMode(window.windowCode, 'all')"
+              >
+                全期
+              </button>
+            </div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">
+          <div v-if="historyMode[window.windowCode] !== 'all'" class="mt-3 flex flex-wrap gap-2">
             <button
               v-for="item in historyStateRows(window.windowCode)"
               :key="item.state"
@@ -95,17 +116,37 @@
           <div class="table-wrap mt-3">
             <table class="decision-table">
               <thead>
-                <tr>
-                  <th>年份</th>
-                  <th>次数</th>
+                <tr v-if="historyMode[window.windowCode] === 'all'">
+                  <th class="sortable" @click="sortHistory(window.windowCode, 'state')">
+                    状态{{ sortMark(window.windowCode, 'state') }}
+                  </th>
+                  <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
+                    次数{{ sortMark(window.windowCode, 'count') }}
+                  </th>
+                </tr>
+                <tr v-else>
+                  <th class="sortable" @click="sortHistory(window.windowCode, 'year')">
+                    年份{{ sortMark(window.windowCode, 'year') }}
+                  </th>
+                  <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
+                    次数{{ sortMark(window.windowCode, 'count') }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in historyYearRows(window.windowCode)" :key="row.year">
-                  <td>{{ row.year }}</td>
-                  <td>{{ row.count }}</td>
-                </tr>
-                <tr v-if="historyYearRows(window.windowCode).length === 0">
+                <template v-if="historyMode[window.windowCode] === 'all'">
+                  <tr v-for="row in allHistoryRows(window.windowCode)" :key="row.state">
+                    <td>{{ row.state }}</td>
+                    <td>{{ row.count }}</td>
+                  </tr>
+                </template>
+                <template v-else>
+                  <tr v-for="row in historyYearRows(window.windowCode)" :key="row.year">
+                    <td>{{ row.year }}</td>
+                    <td>{{ row.count }}</td>
+                  </tr>
+                </template>
+                <tr v-if="historyTableEmpty(window.windowCode)">
                   <td colspan="2" class="text-center text-text-secondary">暂无年度统计</td>
                 </tr>
               </tbody>
@@ -270,6 +311,10 @@ const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const ballAdjust = reactive<Record<string, number>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
+const historyMode = reactive<Record<string, 'year' | 'all'>>({});
+const historySortField = reactive<Record<string, 'year' | 'state' | 'count'>>({});
+const historySortAsc = reactive<Record<string, boolean>>({});
+const historyCollapsed = ref(false);
 const qiHaoList = ref<string[]>([]);
 const showQiHaoDropdown = ref(false);
 const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
@@ -362,6 +407,9 @@ function resetHistoryTabs() {
   }
   for (const window of prepare.value.windows) {
     activeHistoryState[window.windowCode] = historyStateRows(window.windowCode)[0]?.state || '';
+    historyMode[window.windowCode] = historyMode[window.windowCode] || 'year';
+    historySortField[window.windowCode] = historySortField[window.windowCode] || 'year';
+    historySortAsc[window.windowCode] = historySortAsc[window.windowCode] ?? true;
   }
 }
 
@@ -379,6 +427,16 @@ function historyStateRows(windowCode: string) {
     .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
 }
 
+function allHistoryRows(windowCode: string) {
+  const stats = historyStat(windowCode);
+  if (!stats) {
+    return [];
+  }
+  return Object.entries(stats.finalStateCount || {})
+    .map(([state, count]) => ({ state, count }))
+    .sort((a, b) => compareHistoryRows(windowCode, a, b));
+}
+
 function historyYearRows(windowCode: string) {
   const stats = historyStat(windowCode);
   const selectedState = activeHistoryState[windowCode];
@@ -387,7 +445,49 @@ function historyYearRows(windowCode: string) {
   }
   return Object.entries(stats.finalStateYearCount?.[selectedState] || {})
     .map(([year, count]) => ({ year, count }))
-    .sort((a, b) => Number(a.year) - Number(b.year));
+    .sort((a, b) => compareHistoryRows(windowCode, a, b));
+}
+
+function sortHistory(windowCode: string, field: 'year' | 'state' | 'count') {
+  if (historySortField[windowCode] === field) {
+    historySortAsc[windowCode] = !historySortAsc[windowCode];
+  } else {
+    historySortField[windowCode] = field;
+    historySortAsc[windowCode] = field !== 'count';
+  }
+}
+
+function setHistoryMode(windowCode: string, mode: 'year' | 'all') {
+  historyMode[windowCode] = mode;
+  historySortField[windowCode] = mode === 'all' ? 'count' : 'year';
+  historySortAsc[windowCode] = mode !== 'all';
+}
+
+function sortMark(windowCode: string, field: 'year' | 'state' | 'count') {
+  return historySortField[windowCode] === field ? (historySortAsc[windowCode] ? ' ▲' : ' ▼') : '';
+}
+
+function compareHistoryRows(
+  windowCode: string,
+  a: { year?: string; state?: string; count: number },
+  b: { year?: string; state?: string; count: number }
+) {
+  const field = historySortField[windowCode] || (historyMode[windowCode] === 'all' ? 'count' : 'year');
+  const asc = historySortAsc[windowCode] ?? (field !== 'count');
+  const direction = asc ? 1 : -1;
+  if (field === 'count') {
+    return (a.count - b.count) * direction;
+  }
+  if (field === 'state') {
+    return String(a.state || '').localeCompare(String(b.state || '')) * direction;
+  }
+  return (Number(a.year || 0) - Number(b.year || 0)) * direction;
+}
+
+function historyTableEmpty(windowCode: string) {
+  return historyMode[windowCode] === 'all'
+    ? allHistoryRows(windowCode).length === 0
+    : historyYearRows(windowCode).length === 0;
 }
 
 async function clearTestData() {
@@ -528,6 +628,11 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(234, 234, 234, 0.08);
   padding: 8px;
   vertical-align: top;
+}
+
+.decision-table th.sortable {
+  cursor: pointer;
+  user-select: none;
 }
 
 .summary-box {
