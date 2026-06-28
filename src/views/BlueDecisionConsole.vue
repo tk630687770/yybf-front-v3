@@ -9,7 +9,35 @@
           <p class="text-xs text-text-secondary">按蓝10/16/32窗口逐步观察、调权、保存样本并复盘。</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <input v-model="predictQiHao" class="field w-28" placeholder="预测期号" />
+          <div class="relative flex items-center">
+            <input
+              v-model="predictQiHao"
+              class="w-24 h-8 px-2 pr-6 text-xs bg-bg-secondary text-text-primary rounded-l border border-r-0 border-gray-600 focus:outline-none focus:border-accent"
+              placeholder="预测期号"
+              @keydown.up.prevent="moveQiHao(-1)"
+              @keydown.down.prevent="moveQiHao(1)"
+              @keydown.enter.prevent="loadPrepare"
+              @focus="showQiHaoDropdown = predictQiHao.length >= 4"
+              @blur="hideQiHaoDropdown"
+            />
+            <div class="absolute right-1 flex flex-col">
+              <button class="w-4 h-2 leading-none text-text-secondary hover:text-text-primary" @mousedown.prevent="moveQiHao(-1)">▲</button>
+              <button class="w-4 h-2 leading-none text-text-secondary hover:text-text-primary" @mousedown.prevent="moveQiHao(1)">▼</button>
+            </div>
+            <div
+              v-if="showQiHaoDropdown && qiHaoSuggestions.length > 0"
+              class="absolute top-full left-0 mt-1 w-full bg-bg-secondary border border-gray-600 rounded shadow-lg z-50 max-h-48 overflow-y-auto"
+            >
+              <div
+                v-for="item in qiHaoSuggestions"
+                :key="item"
+                class="px-2 py-1 text-xs cursor-pointer hover:bg-accent"
+                @mousedown.prevent="selectQiHao(item)"
+              >
+                {{ item }}
+              </div>
+            </div>
+          </div>
           <button class="btn primary" :disabled="loading" @click="loadPrepare">读取窗口</button>
           <button class="btn" :disabled="loading || !prepare" @click="runScore">重新评分</button>
           <button class="btn danger" :disabled="loading" @click="clearTestData">删除测试数据</button>
@@ -25,7 +53,7 @@
           <span class="text-xs text-text-secondary">状态：{{ window.stateText }}</span>
         </div>
         <div class="mt-3 space-y-2">
-          <div v-for="level in window.levels" :key="level.level" class="level-row">
+          <div v-for="level in displayLevels(window)" :key="level.level" class="level-row">
             <div class="level-title">lv{{ level.level }}</div>
             <div class="flex flex-wrap gap-1">
               <span
@@ -37,6 +65,51 @@
                 {{ number }}{{ level.willDownNumbers.includes(number) ? '↓' : '' }}
               </span>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="prepare" class="decision-card">
+      <div>
+        <h2 class="font-bold">同状态历史完成统计</h2>
+        <p class="text-xs text-text-secondary">模糊匹配当前初始状态，切换标签查看不同最终升级状态的年度分布。</p>
+      </div>
+      <div class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
+        <div v-for="window in prepare.windows" :key="window.windowCode" class="history-card">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold">{{ window.windowName }}</h3>
+            <span class="text-xs text-text-secondary">当前：{{ historyStat(window.windowCode)?.currentState || '--' }}</span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              v-for="item in historyStateRows(window.windowCode)"
+              :key="item.state"
+              class="state-tab"
+              :class="{ active: activeHistoryState[window.windowCode] === item.state }"
+              @click="activeHistoryState[window.windowCode] = item.state"
+            >
+              {{ item.state }}：{{ item.count }}
+            </button>
+          </div>
+          <div class="table-wrap mt-3">
+            <table class="decision-table">
+              <thead>
+                <tr>
+                  <th>年份</th>
+                  <th>次数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in historyYearRows(window.windowCode)" :key="row.year">
+                  <td>{{ row.year }}</td>
+                  <td>{{ row.count }}</td>
+                </tr>
+                <tr v-if="historyYearRows(window.windowCode).length === 0">
+                  <td colspan="2" class="text-center text-text-secondary">暂无年度统计</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -165,6 +238,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import LatestDrawInfo from '@/components/lottery/LatestDrawInfo.vue';
 import { useLotteryStore } from '@/stores/lottery';
+import { db } from '@/composables/useDatabase';
 import {
   deleteBlueDecisionTestData,
   listBlueDecision,
@@ -174,6 +248,9 @@ import {
   saveBlueDecision,
   scoreBlueDecision,
   type BlueDecisionPrepare,
+  type BlueDecisionWindow,
+  type BlueDecisionLevel,
+  type BlueDecisionHistoryStat,
   type BlueDecisionScore,
   type BlueDecisionSnapshot
 } from '@/api/modules/blueDecision';
@@ -192,9 +269,20 @@ const forcedNumbers = ref<string[]>([]);
 const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const ballAdjust = reactive<Record<string, number>>({});
+const activeHistoryState = reactive<Record<string, string>>({});
+const qiHaoList = ref<string[]>([]);
+const showQiHaoDropdown = ref(false);
 const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
 
 const messageClass = computed(() => messageType.value === 'ok' ? 'text-green-300' : 'text-ball-red');
+const qiHaoSuggestions = computed(() => {
+  if (predictQiHao.value.length < 4) {
+    return [];
+  }
+  return qiHaoList.value
+    .filter(qiHao => qiHao.startsWith(predictQiHao.value))
+    .slice(0, 20);
+});
 
 function manualAdjust() {
   return {
@@ -209,6 +297,7 @@ function manualAdjust() {
 async function loadPrepare() {
   await run(async () => {
     prepare.value = await prepareBlueDecision(predictQiHao.value);
+    resetHistoryTabs();
     await runScore();
     await loadSnapshots();
     setMessage('窗口读取完成');
@@ -263,6 +352,44 @@ function echoSnapshot(snapshot: BlueDecisionSnapshot) {
   setMessage(`已回显样本 ${snapshot.id}`);
 }
 
+function displayLevels(window: BlueDecisionWindow): BlueDecisionLevel[] {
+  return [...window.levels].sort((a, b) => b.level - a.level);
+}
+
+function resetHistoryTabs() {
+  if (!prepare.value) {
+    return;
+  }
+  for (const window of prepare.value.windows) {
+    activeHistoryState[window.windowCode] = historyStateRows(window.windowCode)[0]?.state || '';
+  }
+}
+
+function historyStat(windowCode: string): BlueDecisionHistoryStat | null {
+  return prepare.value?.historyStats?.[windowCode] || null;
+}
+
+function historyStateRows(windowCode: string) {
+  const stats = historyStat(windowCode);
+  if (!stats) {
+    return [];
+  }
+  return Object.entries(stats.finalStateCount || {})
+    .map(([state, count]) => ({ state, count }))
+    .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
+}
+
+function historyYearRows(windowCode: string) {
+  const stats = historyStat(windowCode);
+  const selectedState = activeHistoryState[windowCode];
+  if (!stats || !selectedState) {
+    return [];
+  }
+  return Object.entries(stats.finalStateYearCount?.[selectedState] || {})
+    .map(([year, count]) => ({ year, count }))
+    .sort((a, b) => Number(a.year) - Number(b.year));
+}
+
 async function clearTestData() {
   await run(async () => {
     const result = await deleteBlueDecisionTestData();
@@ -288,8 +415,32 @@ function setMessage(text: string, type: 'ok' | 'error' = 'ok') {
   messageType.value = type;
 }
 
+function moveQiHao(direction: -1 | 1) {
+  if (qiHaoList.value.length === 0) {
+    return;
+  }
+  const currentIndex = qiHaoList.value.indexOf(predictQiHao.value);
+  const nextIndex = currentIndex === -1
+    ? (direction > 0 ? 0 : qiHaoList.value.length - 1)
+    : (currentIndex + direction + qiHaoList.value.length) % qiHaoList.value.length;
+  predictQiHao.value = qiHaoList.value[nextIndex];
+}
+
+function selectQiHao(qiHao: string) {
+  predictQiHao.value = qiHao;
+  showQiHaoDropdown.value = false;
+  void loadPrepare();
+}
+
+function hideQiHaoDropdown() {
+  window.setTimeout(() => {
+    showQiHaoDropdown.value = false;
+  }, 200);
+}
+
 onMounted(async () => {
   await lotteryStore.loadLatestFromDB();
+  qiHaoList.value = await db.getAllQiHaoList();
   predictQiHao.value = lotteryStore.latestDraw?.nextQiHao || lotteryStore.latestDraw?.qiHao || '';
   if (predictQiHao.value) {
     await loadPrepare();
@@ -394,5 +545,25 @@ onMounted(async () => {
 .summary-value {
   margin-top: 4px;
   font-weight: 700;
+}
+
+.history-card {
+  border: 1px solid rgba(234, 234, 234, 0.1);
+  border-radius: 8px;
+  background: rgba(22, 33, 62, 0.45);
+  padding: 12px;
+}
+
+.state-tab {
+  border-radius: 999px;
+  background: rgba(55, 66, 250, 0.22);
+  padding: 5px 9px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.state-tab.active {
+  background: var(--color-accent);
+  color: #ffffff;
 }
 </style>

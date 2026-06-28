@@ -21,11 +21,17 @@ export interface BlueDecisionWindow {
   levels: BlueDecisionLevel[];
 }
 
+export interface BlueDecisionHistoryStat {
+  currentState: string;
+  finalStateCount: Record<string, number>;
+  finalStateYearCount: Record<string, Record<string, number>>;
+}
+
 export interface BlueDecisionPrepare {
   predictQiHao: string;
   sourceQiHao: string;
   windows: BlueDecisionWindow[];
-  historyStats: Record<string, unknown>;
+  historyStats: Record<string, BlueDecisionHistoryStat>;
 }
 
 export interface BlueBallScore {
