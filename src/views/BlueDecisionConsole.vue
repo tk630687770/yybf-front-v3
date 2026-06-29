@@ -168,7 +168,7 @@
                 </tr>
                 <tr v-else>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'year')">
-                    年份<span class="sort-mark">{{ sortMark(window.windowCode, 'year') }}</span>
+                    年份({{ historyYearRows(window.windowCode).length }}年)<span class="sort-mark">{{ sortMark(window.windowCode, 'year') }}</span>
                   </th>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
                     次数<span class="sort-mark">{{ sortMark(window.windowCode, 'count') }}</span>
@@ -226,7 +226,7 @@
               <thead>
                 <tr>
                   <th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'year')">
-                    年份<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'year') }}</span>
+                    年份({{ historyYearRowsForState(selectedHistoryWindow, item.state).length }}年)<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'year') }}</span>
                   </th>
                   <th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'count')">
                     次数<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'count') }}</span>
