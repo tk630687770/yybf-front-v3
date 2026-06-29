@@ -203,7 +203,10 @@
       <div v-if="!historyCollapsed && selectedHistoryWindow !== 'ALL'" class="mt-3 history-state-grid">
         <div v-for="item in selectedWindowStateRows" :key="item.state" class="history-card compact-card">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="font-bold">{{ item.state }}</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="font-bold">{{ item.state }}</h3>
+              <span v-if="stateLevelLabel(item.state)" class="history-level">{{ stateLevelLabel(item.state) }}</span>
+            </div>
             <span class="history-meta" :class="{ 'actual-blue-hit': item.currentYearCount > 0 }">全{{ item.count }}/今{{ item.currentYearCount }}</span>
           </div>
           <div class="history-summary">
@@ -693,6 +696,11 @@ function stateSortKey(windowCode: string, state: string) {
   return `${windowCode}:${state}`;
 }
 
+function stateLevelLabel(state: string) {
+  const index = state.split('_').findIndex(part => part.includes('*'));
+  return index >= 0 ? `LV${index}` : '';
+}
+
 function compareHistoryRows(
   windowCode: string,
   a: { year?: string; state?: string; count: number; currentYearCount?: number },
@@ -1017,6 +1025,14 @@ onMounted(async () => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   padding: 2px 7px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.history-level {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
   color: var(--color-text-secondary);
   font-size: 11px;
 }
