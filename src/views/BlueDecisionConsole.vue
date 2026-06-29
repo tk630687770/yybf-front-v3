@@ -79,14 +79,32 @@
     <section v-if="prepare" class="decision-card">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="font-bold">同状态历史完成统计</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="font-bold">同状态历史完成统计</h2>
+            <button
+              class="state-tab"
+              :class="{ active: selectedHistoryWindow === 'ALL' }"
+              @click="selectedHistoryWindow = 'ALL'"
+            >
+              全部
+            </button>
+            <button
+              v-for="window in prepare.windows"
+              :key="window.windowCode"
+              class="state-tab"
+              :class="{ active: selectedHistoryWindow === window.windowCode }"
+              @click="selectedHistoryWindow = window.windowCode"
+            >
+              {{ window.windowName }}
+            </button>
+          </div>
           <p class="text-xs text-text-secondary">模糊匹配当前初始状态，切换标签查看不同最终升级状态的年度分布。</p>
         </div>
         <button class="btn" @click="historyCollapsed = !historyCollapsed">
           {{ historyCollapsed ? '展开' : '收起' }}
         </button>
       </div>
-      <div v-if="!historyCollapsed" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
+      <div v-if="!historyCollapsed && selectedHistoryWindow === 'ALL'" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
         <div v-for="window in prepare.windows" :key="window.windowCode" class="history-card">
           <div class="flex items-center justify-between gap-2">
             <h3 class="font-bold">{{ window.windowName }}</h3>
@@ -166,6 +184,43 @@
                 </template>
                 <tr v-if="historyTableEmpty(window.windowCode)">
                   <td :colspan="historyMode[window.windowCode] === 'all' ? 3 : 2" class="text-center text-text-secondary">暂无年度统计</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div v-if="!historyCollapsed && selectedHistoryWindow !== 'ALL'" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
+        <div v-for="item in selectedWindowStateRows" :key="item.state" class="history-card">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold">{{ selectedHistoryWindowName }}：{{ item.state }}</h3>
+            <div class="flex items-center gap-2 text-xs text-text-secondary">
+              <span>全期 {{ item.count }}</span>
+              <span :class="{ 'actual-blue-hit': item.currentYearCount > 0 }">今年 {{ item.currentYearCount }}</span>
+            </div>
+          </div>
+          <div class="history-summary">
+            {{ historySummaryForState(selectedHistoryWindow, item.state) }}
+          </div>
+          <div class="table-wrap mt-3">
+            <table class="decision-table">
+              <thead>
+                <tr>
+                  <th>年份</th>
+                  <th>次数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in historyYearRowsForState(selectedHistoryWindow, item.state)"
+                  :key="row.year"
+                  :class="{ 'current-year-row': row.year === currentHistoryYear }"
+                >
+                  <td>{{ row.year }}</td>
+                  <td>{{ row.count }}</td>
+                </tr>
+                <tr v-if="historyYearRowsForState(selectedHistoryWindow, item.state).length === 0">
+                  <td colspan="2" class="text-center text-text-secondary">暂无年度统计</td>
                 </tr>
               </tbody>
             </table>
@@ -347,6 +402,7 @@ const historyMode = reactive<Record<string, 'year' | 'all'>>({});
 const historySortField = reactive<Record<string, HistorySortField>>({});
 const historySortAsc = reactive<Record<string, boolean>>({});
 const historyCollapsed = ref(false);
+const selectedHistoryWindow = ref('ALL');
 
 type HistorySortField = 'year' | 'state' | 'count' | 'currentYearCount';
 const qiHaoList = ref<string[]>([]);
@@ -354,6 +410,10 @@ const showQiHaoDropdown = ref(false);
 const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
 
 const messageClass = computed(() => messageType.value === 'ok' ? 'text-green-300' : 'text-ball-red');
+const selectedWindowStateRows = computed(() => historyStateRows(selectedHistoryWindow.value));
+const selectedHistoryWindowName = computed(() =>
+  prepare.value?.windows.find(window => window.windowCode === selectedHistoryWindow.value)?.windowName || ''
+);
 const qiHaoSuggestions = computed(() => {
   if (predictQiHao.value.length < 4) {
     return [];
@@ -494,12 +554,15 @@ function allHistoryRows(windowCode: string) {
 }
 
 function historyYearRows(windowCode: string) {
+  return historyYearRowsForState(windowCode, activeHistoryState[windowCode]);
+}
+
+function historyYearRowsForState(windowCode: string, state: string) {
   const stats = historyStat(windowCode);
-  const selectedState = activeHistoryState[windowCode];
-  if (!stats || !selectedState) {
+  if (!stats || !state) {
     return [];
   }
-  return Object.entries(stats.finalStateYearCount?.[selectedState] || {})
+  return Object.entries(stats.finalStateYearCount?.[state] || {})
     .map(([year, count]) => ({ year, count }))
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
 }
@@ -509,8 +572,11 @@ function currentYearCount(stats: BlueDecisionHistoryStat, state: string) {
 }
 
 function activeHistorySummary(windowCode: string) {
+  return historySummaryForState(windowCode, activeHistoryState[windowCode]);
+}
+
+function historySummaryForState(windowCode: string, selectedState: string) {
   const stats = historyStat(windowCode);
-  const selectedState = activeHistoryState[windowCode];
   const counts = Object.values(stats?.finalStateYearCount?.[selectedState] || {}).map(Number).sort((a, b) => a - b);
   if (!stats || !selectedState || counts.length === 0) {
     return '年度摘要：暂无数据';
