@@ -43,7 +43,6 @@
           </button>
           <button class="btn primary" :disabled="loading" @click="loadPrepare">读取窗口</button>
           <button class="btn" :disabled="loading || !prepare" @click="runScore">重新评分</button>
-          <button class="btn danger" :disabled="loading" @click="clearTestData">删除测试数据</button>
         </div>
       </div>
       <div v-if="message" class="mt-3 text-xs" :class="messageClass">{{ message }}</div>
@@ -260,10 +259,6 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
           <input v-model="sampleName" class="field w-40" placeholder="样本名称" />
-          <label class="inline-flex items-center gap-1">
-            <input v-model="testData" type="checkbox" />
-            测试数据
-          </label>
           <button class="btn primary" :disabled="loading" @click="saveSnapshot">保存样本</button>
           <button class="btn" :disabled="loading" @click="loadSnapshots">读取样本</button>
           <button class="btn" :disabled="loading" @click="reviewBatch">批量复盘</button>
@@ -336,12 +331,18 @@
     <section class="decision-card">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-bold">已保存样本</h2>
-        <span class="text-xs text-text-secondary">{{ snapshots.length }} 条</span>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-text-secondary">{{ snapshots.length }} 条 / 已选 {{ selectedSnapshotIds.length }} 条</span>
+          <button class="btn danger" :disabled="loading || selectedSnapshotIds.length === 0" @click="deleteSelectedSnapshots">删除选中</button>
+        </div>
       </div>
       <div class="table-wrap mt-3">
         <table class="decision-table">
           <thead>
             <tr>
+              <th>
+                <input v-model="allSnapshotsSelected" type="checkbox" :disabled="snapshots.length === 0" />
+              </th>
               <th>ID</th>
               <th>期号</th>
               <th>样本</th>
@@ -355,6 +356,7 @@
           </thead>
           <tbody>
             <tr v-for="snapshot in snapshots" :key="snapshot.id">
+              <td><input v-model="selectedSnapshotIds" type="checkbox" :value="snapshot.id" /></td>
               <td>{{ snapshot.id }}</td>
               <td>{{ snapshot.predictQiHao }}</td>
               <td>{{ snapshot.sampleName }}</td>
@@ -368,10 +370,11 @@
               <td>
                 <button class="btn" :disabled="loading" @click="echoSnapshot(snapshot)">回显</button>
                 <button class="btn" :disabled="loading" @click="reviewOne(snapshot.id)">复盘</button>
+                <button class="btn danger" :disabled="loading" @click="deleteSnapshots([snapshot.id])">删除</button>
               </td>
             </tr>
             <tr v-if="snapshots.length === 0">
-              <td colspan="9" class="text-center text-text-secondary">暂无样本</td>
+              <td colspan="10" class="text-center text-text-secondary">暂无样本</td>
             </tr>
           </tbody>
         </table>
@@ -390,7 +393,7 @@ import LatestDrawInfo from '@/components/lottery/LatestDrawInfo.vue';
 import { useLotteryStore } from '@/stores/lottery';
 import { db } from '@/composables/useDatabase';
 import {
-  deleteBlueDecisionTestData,
+  deleteBlueDecisionSnapshots,
   listBlueDecision,
   prepareBlueDecision,
   reviewBlueDecision,
@@ -408,7 +411,6 @@ import {
 const lotteryStore = useLotteryStore();
 const predictQiHao = ref('');
 const sampleName = ref('蓝球窗口样本');
-const testData = ref(false);
 const loading = ref(false);
 const message = ref('');
 const messageType = ref<'ok' | 'error'>('ok');
@@ -419,6 +421,7 @@ const selectedBlue = ref<string[]>([]);
 const forcedNumbers = ref<string[]>([]);
 const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
+const selectedSnapshotIds = ref<number[]>([]);
 const ballAdjust = reactive<Record<string, number>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
@@ -437,6 +440,12 @@ const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1
 
 const messageClass = computed(() => messageType.value === 'ok' ? 'text-green-300' : 'text-ball-red');
 const selectedWindowStateRows = computed(() => historyStateRows(selectedHistoryWindow.value));
+const allSnapshotsSelected = computed({
+  get: () => snapshots.value.length > 0 && snapshots.value.every(snapshot => selectedSnapshotIds.value.includes(snapshot.id)),
+  set: checked => {
+    selectedSnapshotIds.value = checked ? snapshots.value.map(snapshot => snapshot.id) : [];
+  }
+});
 const qiHaoSuggestions = computed(() => {
   if (predictQiHao.value.length < 4) {
     return [];
@@ -480,8 +489,7 @@ async function saveSnapshot() {
       predictQiHao: predictQiHao.value,
       sampleName: sampleName.value,
       manualAdjust: manualAdjust(),
-      selectedBlue: selectedBlue.value,
-      testData: testData.value
+      selectedBlue: selectedBlue.value
     });
     await loadSnapshots();
     setMessage('样本已保存');
@@ -490,6 +498,7 @@ async function saveSnapshot() {
 
 async function loadSnapshots() {
   snapshots.value = await listBlueDecision(predictQiHao.value);
+  selectedSnapshotIds.value = selectedSnapshotIds.value.filter(id => snapshots.value.some(snapshot => snapshot.id === id));
 }
 
 async function reviewOne(id: number) {
@@ -505,6 +514,22 @@ async function reviewBatch() {
     await reviewBlueDecisionBatch(predictQiHao.value);
     await loadSnapshots();
     setMessage('批量复盘完成');
+  });
+}
+
+async function deleteSelectedSnapshots() {
+  await deleteSnapshots(selectedSnapshotIds.value);
+}
+
+async function deleteSnapshots(ids: number[]) {
+  if (ids.length === 0 || !window.confirm(`确认删除 ${ids.length} 条蓝球决策样本？`)) {
+    return;
+  }
+  await run(async () => {
+    const result = await deleteBlueDecisionSnapshots(ids);
+    selectedSnapshotIds.value = selectedSnapshotIds.value.filter(id => !ids.includes(id));
+    await loadSnapshots();
+    setMessage(`已删除样本 ${result.deletedCount} 条`);
   });
 }
 
@@ -702,14 +727,6 @@ function historyTableEmpty(windowCode: string) {
   return historyMode[windowCode] === 'all'
     ? allHistoryRows(windowCode).length === 0
     : historyYearRows(windowCode).length === 0;
-}
-
-async function clearTestData() {
-  await run(async () => {
-    const result = await deleteBlueDecisionTestData();
-    await loadSnapshots();
-    setMessage(`已删除测试数据 ${result.deletedCount} 条`);
-  });
 }
 
 async function run(task: () => Promise<void>) {

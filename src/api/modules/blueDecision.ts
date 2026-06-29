@@ -89,7 +89,6 @@ export async function saveBlueDecision(payload: {
   sampleName: string;
   manualAdjust: BlueDecisionManualAdjust;
   selectedBlue: string[];
-  testData: boolean;
 }): Promise<BlueDecisionSnapshot> {
   const response = await request.post('/ssq/window/decision/blue/snapshot/save', payload);
   return unwrapResponse<BlueDecisionSnapshot>(response);
@@ -118,8 +117,8 @@ export async function reviewBlueDecisionBatch(
   return unwrapResponse<BlueDecisionSnapshot[]>(response);
 }
 
-export async function deleteBlueDecisionTestData(): Promise<{ deletedCount: number }> {
-  const response = await request.delete('/ssq/window/decision/blue/snapshot/test-data');
+export async function deleteBlueDecisionSnapshots(ids: number[]): Promise<{ deletedCount: number }> {
+  const response = await request.post('/ssq/window/decision/blue/snapshot/delete-batch', { ids });
   return unwrapResponse<{ deletedCount: number }>(response);
 }
 
