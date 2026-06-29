@@ -208,7 +208,9 @@
             </thead>
             <tbody>
               <tr v-for="row in scoreResult.scores" :key="row.number">
-                <td class="font-bold text-ball-blue">{{ row.number }}</td>
+                <td class="font-bold">
+                  <span :class="{ 'actual-blue-hit': isActualBlue(row.number) }">{{ row.number }}</span>
+                </td>
                 <td>{{ row.score }}</td>
                 <td>{{ row.grade }}</td>
                 <td><input v-model="selectedBlue" type="checkbox" :value="row.number" /></td>
@@ -223,11 +225,22 @@
         <div class="space-y-3">
           <div class="summary-box">
             <div class="summary-label">系统候选</div>
-            <div class="summary-value text-ball-blue">{{ scoreResult.candidateBlue.join(',') }}</div>
+            <div class="summary-value">
+              <template v-for="(number, index) in scoreResult.candidateBlue" :key="number">
+                <span :class="{ 'actual-blue-hit': isActualBlue(number) }">{{ number }}</span>{{ index < scoreResult.candidateBlue.length - 1 ? ',' : '' }}
+              </template>
+            </div>
           </div>
           <div class="summary-box">
             <div class="summary-label">最终选择</div>
-            <div class="summary-value">{{ selectedBlue.join(',') || '未选择' }}</div>
+            <div class="summary-value">
+              <template v-if="selectedBlue.length > 0">
+                <template v-for="(number, index) in selectedBlue" :key="number">
+                  <span :class="{ 'actual-blue-hit': isActualBlue(number) }">{{ number }}</span>{{ index < selectedBlue.length - 1 ? ',' : '' }}
+                </template>
+              </template>
+              <template v-else>未选择</template>
+            </div>
           </div>
           <div class="summary-box">
             <div class="summary-label">人工分数微调（可选）</div>
@@ -424,6 +437,12 @@ function displayLevels(window: BlueDecisionWindow): BlueDecisionLevel[] {
 
 function isHitBlue(level: BlueDecisionLevel, number: string) {
   return (level.hitNumbers || []).includes(number);
+}
+
+function isActualBlue(number: string) {
+  return showDrawBlue.value && Boolean(prepare.value?.windows.some(window =>
+    window.levels.some(level => (level.hitNumbers || []).includes(number))
+  ));
 }
 
 function resetHistoryTabs() {
@@ -718,6 +737,11 @@ onMounted(async () => {
 .summary-value {
   margin-top: 4px;
   font-weight: 700;
+}
+
+.actual-blue-hit {
+  color: var(--color-accent);
+  font-weight: 800;
 }
 
 .history-card {
