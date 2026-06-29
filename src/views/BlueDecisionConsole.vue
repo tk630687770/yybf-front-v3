@@ -91,11 +91,12 @@
             <button
               v-for="window in prepare.windows"
               :key="window.windowCode"
-              class="state-tab"
+              class="state-tab window-history-tab"
               :class="{ active: selectedHistoryWindow === window.windowCode }"
               @click="selectedHistoryWindow = window.windowCode"
             >
-              {{ window.windowName }}
+              <span>{{ window.windowName }}</span>
+              <span class="window-tab-state">{{ historyStat(window.windowCode)?.currentState || '--' }}</span>
             </button>
           </div>
           <p class="text-xs text-text-secondary">模糊匹配当前初始状态，切换标签查看不同最终升级状态的年度分布。</p>
@@ -108,17 +109,16 @@
         <div v-for="window in prepare.windows" :key="window.windowCode" class="history-card">
           <div class="flex items-center justify-between gap-2">
             <h3 class="font-bold">{{ window.windowName }}</h3>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-text-secondary">当前：{{ historyStat(window.windowCode)?.currentState || '--' }}</span>
+            <div class="segmented">
               <button
-                class="state-tab"
+                class="state-tab compact"
                 :class="{ active: historyMode[window.windowCode] !== 'all' }"
                 @click="setHistoryMode(window.windowCode, 'year')"
               >
                 年度
               </button>
               <button
-                class="state-tab"
+                class="state-tab compact"
                 :class="{ active: historyMode[window.windowCode] === 'all' }"
                 @click="setHistoryMode(window.windowCode, 'all')"
               >
@@ -139,28 +139,39 @@
             </button>
           </div>
           <div v-if="historyMode[window.windowCode] !== 'all'" class="history-summary">
-            {{ activeHistorySummary(window.windowCode) }}
+            <template v-if="summaryValues(window.windowCode, activeHistoryState[window.windowCode]).length > 0">
+              <span
+                v-for="value in summaryValues(window.windowCode, activeHistoryState[window.windowCode])"
+                :key="value"
+                class="summary-chip"
+                :class="summaryChipClass(window.windowCode, activeHistoryState[window.windowCode], value)"
+              >
+                {{ value }}
+              </span>
+              <span class="summary-average">{{ summaryAverage(window.windowCode, activeHistoryState[window.windowCode]) }}</span>
+            </template>
+            <span v-else>暂无</span>
           </div>
           <div class="table-wrap mt-3">
             <table class="decision-table">
               <thead>
                 <tr v-if="historyMode[window.windowCode] === 'all'">
                   <th class="sortable" @click="sortHistory(window.windowCode, 'state')">
-                    状态{{ sortMark(window.windowCode, 'state') }}
+                    状态<span class="sort-mark">{{ sortMark(window.windowCode, 'state') }}</span>
                   </th>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
-                    次数{{ sortMark(window.windowCode, 'count') }}
+                    次数<span class="sort-mark">{{ sortMark(window.windowCode, 'count') }}</span>
                   </th>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'currentYearCount')">
-                    今年次数{{ sortMark(window.windowCode, 'currentYearCount') }}
+                    今年次数<span class="sort-mark">{{ sortMark(window.windowCode, 'currentYearCount') }}</span>
                   </th>
                 </tr>
                 <tr v-else>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'year')">
-                    年份{{ sortMark(window.windowCode, 'year') }}
+                    年份<span class="sort-mark">{{ sortMark(window.windowCode, 'year') }}</span>
                   </th>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
-                    次数{{ sortMark(window.windowCode, 'count') }}
+                    次数<span class="sort-mark">{{ sortMark(window.windowCode, 'count') }}</span>
                   </th>
                 </tr>
               </thead>
@@ -190,24 +201,36 @@
           </div>
         </div>
       </div>
-      <div v-if="!historyCollapsed && selectedHistoryWindow !== 'ALL'" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
-        <div v-for="item in selectedWindowStateRows" :key="item.state" class="history-card">
+      <div v-if="!historyCollapsed && selectedHistoryWindow !== 'ALL'" class="mt-3 history-state-grid">
+        <div v-for="item in selectedWindowStateRows" :key="item.state" class="history-card compact-card">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="font-bold">{{ selectedHistoryWindowName }}：{{ item.state }}</h3>
-            <div class="flex items-center gap-2 text-xs text-text-secondary">
-              <span>全期 {{ item.count }}</span>
-              <span :class="{ 'actual-blue-hit': item.currentYearCount > 0 }">今年 {{ item.currentYearCount }}</span>
-            </div>
+            <h3 class="font-bold">{{ item.state }}</h3>
+            <span class="history-meta" :class="{ 'actual-blue-hit': item.currentYearCount > 0 }">全{{ item.count }}/今{{ item.currentYearCount }}</span>
           </div>
           <div class="history-summary">
-            {{ historySummaryForState(selectedHistoryWindow, item.state) }}
+            <template v-if="summaryValues(selectedHistoryWindow, item.state).length > 0">
+              <span
+                v-for="value in summaryValues(selectedHistoryWindow, item.state)"
+                :key="value"
+                class="summary-chip"
+                :class="summaryChipClass(selectedHistoryWindow, item.state, value)"
+              >
+                {{ value }}
+              </span>
+              <span class="summary-average">{{ summaryAverage(selectedHistoryWindow, item.state) }}</span>
+            </template>
+            <span v-else>暂无</span>
           </div>
           <div class="table-wrap mt-3">
             <table class="decision-table">
               <thead>
                 <tr>
-                  <th>年份</th>
-                  <th>次数</th>
+                  <th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'year')">
+                    年份<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'year') }}</span>
+                  </th>
+                  <th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'count')">
+                    次数<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'count') }}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -401,19 +424,19 @@ const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
 const historySortField = reactive<Record<string, HistorySortField>>({});
 const historySortAsc = reactive<Record<string, boolean>>({});
+const stateHistorySortField = reactive<Record<string, StateHistorySortField>>({});
+const stateHistorySortAsc = reactive<Record<string, boolean>>({});
 const historyCollapsed = ref(false);
 const selectedHistoryWindow = ref('ALL');
 
 type HistorySortField = 'year' | 'state' | 'count' | 'currentYearCount';
+type StateHistorySortField = 'year' | 'count';
 const qiHaoList = ref<string[]>([]);
 const showQiHaoDropdown = ref(false);
 const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
 
 const messageClass = computed(() => messageType.value === 'ok' ? 'text-green-300' : 'text-ball-red');
 const selectedWindowStateRows = computed(() => historyStateRows(selectedHistoryWindow.value));
-const selectedHistoryWindowName = computed(() =>
-  prepare.value?.windows.find(window => window.windowCode === selectedHistoryWindow.value)?.windowName || ''
-);
 const qiHaoSuggestions = computed(() => {
   if (predictQiHao.value.length < 4) {
     return [];
@@ -512,8 +535,8 @@ function resetHistoryTabs() {
   for (const window of prepare.value.windows) {
     activeHistoryState[window.windowCode] = historyStateRows(window.windowCode)[0]?.state || '';
     historyMode[window.windowCode] = historyMode[window.windowCode] || 'year';
-    historySortField[window.windowCode] = historySortField[window.windowCode] || 'year';
-    historySortAsc[window.windowCode] = historySortAsc[window.windowCode] ?? true;
+    delete historySortField[window.windowCode];
+    delete historySortAsc[window.windowCode];
   }
 }
 
@@ -554,38 +577,53 @@ function allHistoryRows(windowCode: string) {
 }
 
 function historyYearRows(windowCode: string) {
-  return historyYearRowsForState(windowCode, activeHistoryState[windowCode]);
+  return historyYearRowsForState(windowCode, activeHistoryState[windowCode], windowCode);
 }
 
-function historyYearRowsForState(windowCode: string, state: string) {
+function historyYearRowsForState(windowCode: string, state: string, sortKey = stateSortKey(windowCode, state)) {
   const stats = historyStat(windowCode);
   if (!stats || !state) {
     return [];
   }
   return Object.entries(stats.finalStateYearCount?.[state] || {})
     .map(([year, count]) => ({ year, count }))
-    .sort((a, b) => compareHistoryRows(windowCode, a, b));
+    .sort((a, b) => compareYearRows(sortKey, a, b));
 }
 
 function currentYearCount(stats: BlueDecisionHistoryStat, state: string) {
   return Number(stats.finalStateYearCount?.[state]?.[currentHistoryYear.value] || 0);
 }
 
-function activeHistorySummary(windowCode: string) {
-  return historySummaryForState(windowCode, activeHistoryState[windowCode]);
-}
-
-function historySummaryForState(windowCode: string, selectedState: string) {
+function historySummaryStats(windowCode: string, selectedState: string) {
   const stats = historyStat(windowCode);
   const counts = Object.values(stats?.finalStateYearCount?.[selectedState] || {}).map(Number).sort((a, b) => a - b);
   if (!stats || !selectedState || counts.length === 0) {
-    return '年度摘要：暂无数据';
+    return { values: [] as number[], median: 0, average: '', current: 0 };
   }
-  const middle = counts.length % 2 === 1
-    ? counts[Math.floor(counts.length / 2)]
-    : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2;
+  const median = counts[Math.floor((counts.length - 1) / 2)];
   const average = counts.reduce((sum, count) => sum + count, 0) / counts.length;
-  return `年度摘要：最小 ${counts[0]} / 中位 ${trimNumber(middle)} / 均值 ${trimNumber(average)} / 最大 ${counts[counts.length - 1]} / 今年 ${currentYearCount(stats, selectedState)}`;
+  return {
+    values: Array.from(new Set(counts)),
+    median,
+    average: trimNumber(average),
+    current: currentYearCount(stats, selectedState)
+  };
+}
+
+function summaryValues(windowCode: string, selectedState: string) {
+  return historySummaryStats(windowCode, selectedState).values;
+}
+
+function summaryAverage(windowCode: string, selectedState: string) {
+  return historySummaryStats(windowCode, selectedState).average;
+}
+
+function summaryChipClass(windowCode: string, selectedState: string, value: number) {
+  const stats = historySummaryStats(windowCode, selectedState);
+  return {
+    median: value === stats.median,
+    current: stats.current > 0 && value === stats.current
+  };
 }
 
 function trimNumber(value: number) {
@@ -601,14 +639,33 @@ function sortHistory(windowCode: string, field: HistorySortField) {
   }
 }
 
+function sortStateHistory(windowCode: string, state: string, field: StateHistorySortField) {
+  const key = stateSortKey(windowCode, state);
+  if (stateHistorySortField[key] === field) {
+    stateHistorySortAsc[key] = !stateHistorySortAsc[key];
+  } else {
+    stateHistorySortField[key] = field;
+    stateHistorySortAsc[key] = true;
+  }
+}
+
 function setHistoryMode(windowCode: string, mode: 'year' | 'all') {
   historyMode[windowCode] = mode;
-  historySortField[windowCode] = mode === 'all' ? 'count' : 'year';
-  historySortAsc[windowCode] = mode !== 'all';
+  delete historySortField[windowCode];
+  delete historySortAsc[windowCode];
 }
 
 function sortMark(windowCode: string, field: HistorySortField) {
-  return historySortField[windowCode] === field ? (historySortAsc[windowCode] ? ' ▲' : ' ▼') : '';
+  return historySortField[windowCode] === field ? (historySortAsc[windowCode] ? '▲' : '▼') : '';
+}
+
+function stateSortMark(windowCode: string, state: string, field: StateHistorySortField) {
+  const key = stateSortKey(windowCode, state);
+  return stateHistorySortField[key] === field ? (stateHistorySortAsc[key] ? '▲' : '▼') : '';
+}
+
+function stateSortKey(windowCode: string, state: string) {
+  return `${windowCode}:${state}`;
 }
 
 function compareHistoryRows(
@@ -629,6 +686,16 @@ function compareHistoryRows(
     return String(a.state || '').localeCompare(String(b.state || '')) * direction;
   }
   return (Number(a.year || 0) - Number(b.year || 0)) * direction;
+}
+
+function compareYearRows(sortKey: string, a: { year: string; count: number }, b: { year: string; count: number }) {
+  const field = sortKey.includes(':') ? (stateHistorySortField[sortKey] || 'year') : (historySortField[sortKey] || 'year');
+  const asc = sortKey.includes(':') ? (stateHistorySortAsc[sortKey] ?? true) : (historySortAsc[sortKey] ?? true);
+  const direction = asc ? 1 : -1;
+  if (field === 'count') {
+    return (a.count - b.count || Number(a.year) - Number(b.year)) * direction;
+  }
+  return (Number(a.year) - Number(b.year) || a.count - b.count) * direction;
 }
 
 function historyTableEmpty(windowCode: string) {
@@ -788,6 +855,12 @@ onMounted(async () => {
   user-select: none;
 }
 
+.sort-mark {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+}
+
 .summary-box {
   border: 1px solid rgba(234, 234, 234, 0.1);
   border-radius: 8px;
@@ -817,6 +890,16 @@ onMounted(async () => {
   padding: 12px;
 }
 
+.compact-card {
+  padding: 10px;
+}
+
+.history-state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
 .state-tab {
   border-radius: 999px;
   background: rgba(55, 66, 250, 0.22);
@@ -825,9 +908,45 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+.state-tab.compact {
+  border-radius: 0;
+  padding: 4px 8px;
+}
+
 .state-tab.active {
   background: var(--color-accent);
   color: #ffffff;
+}
+
+.window-history-tab {
+  display: inline-flex;
+  min-width: 76px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.window-tab-state {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10px;
+}
+
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(234, 234, 234, 0.12);
+  border-radius: 999px;
+}
+
+.segmented .state-tab:first-child {
+  border-bottom-left-radius: 999px;
+  border-top-left-radius: 999px;
+}
+
+.segmented .state-tab:last-child {
+  border-bottom-right-radius: 999px;
+  border-top-right-radius: 999px;
 }
 
 .state-badge {
@@ -839,6 +958,10 @@ onMounted(async () => {
 }
 
 .history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
   margin-top: 8px;
   border: 1px solid rgba(234, 234, 234, 0.1);
   border-radius: 6px;
@@ -846,6 +969,39 @@ onMounted(async () => {
   padding: 7px 9px;
   color: var(--color-text-secondary);
   font-size: 12px;
+}
+
+.summary-chip {
+  min-width: 22px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  text-align: center;
+}
+
+.summary-chip.median {
+  background: rgba(255, 71, 87, 0.32);
+  color: #ffffff;
+}
+
+.summary-chip.current {
+  color: var(--color-accent);
+  font-weight: 800;
+}
+
+.summary-average {
+  margin-left: auto;
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.history-meta {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 7px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
 }
 
 .current-year-row td,
