@@ -117,7 +117,11 @@
               @click="activeHistoryState[window.windowCode] = item.state"
             >
               {{ item.state }}：{{ item.count }}
+              <span class="state-badge">今{{ item.currentYearCount }}</span>
             </button>
+          </div>
+          <div v-if="historyMode[window.windowCode] !== 'all'" class="history-summary">
+            {{ activeHistorySummary(window.windowCode) }}
           </div>
           <div class="table-wrap mt-3">
             <table class="decision-table">
@@ -445,7 +449,11 @@ function historyStateRows(windowCode: string) {
   }
   return Object.entries(stats.finalStateCount || {})
     .filter(([state]) => state !== stats.currentState)
-    .map(([state, count]) => ({ state, count }))
+    .map(([state, count]) => ({
+      state,
+      count,
+      currentYearCount: currentYearCount(stats, state)
+    }))
     .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
 }
 
@@ -461,7 +469,7 @@ function allHistoryRows(windowCode: string) {
     .map(([state, count]) => ({
       state,
       count,
-      currentYearCount: Number(stats.finalStateYearCount?.[state]?.[currentHistoryYear.value] || 0)
+      currentYearCount: currentYearCount(stats, state)
     }))
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
 }
@@ -475,6 +483,28 @@ function historyYearRows(windowCode: string) {
   return Object.entries(stats.finalStateYearCount?.[selectedState] || {})
     .map(([year, count]) => ({ year, count }))
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
+}
+
+function currentYearCount(stats: BlueDecisionHistoryStat, state: string) {
+  return Number(stats.finalStateYearCount?.[state]?.[currentHistoryYear.value] || 0);
+}
+
+function activeHistorySummary(windowCode: string) {
+  const stats = historyStat(windowCode);
+  const selectedState = activeHistoryState[windowCode];
+  const counts = Object.values(stats?.finalStateYearCount?.[selectedState] || {}).map(Number).sort((a, b) => a - b);
+  if (!stats || !selectedState || counts.length === 0) {
+    return '年度摘要：暂无数据';
+  }
+  const middle = counts.length % 2 === 1
+    ? counts[Math.floor(counts.length / 2)]
+    : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2;
+  const average = counts.reduce((sum, count) => sum + count, 0) / counts.length;
+  return `年度摘要：最小 ${counts[0]} / 中位 ${trimNumber(middle)} / 均值 ${trimNumber(average)} / 最大 ${counts[counts.length - 1]} / 今年 ${currentYearCount(stats, selectedState)}`;
+}
+
+function trimNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 function sortHistory(windowCode: string, field: HistorySortField) {
@@ -708,6 +738,24 @@ onMounted(async () => {
 .state-tab.active {
   background: var(--color-accent);
   color: #ffffff;
+}
+
+.state-badge {
+  margin-left: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 1px 5px;
+  font-size: 10px;
+}
+
+.history-summary {
+  margin-top: 8px;
+  border: 1px solid rgba(234, 234, 234, 0.1);
+  border-radius: 6px;
+  background: rgba(15, 27, 56, 0.55);
+  padding: 7px 9px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 
 .current-year-row td,
