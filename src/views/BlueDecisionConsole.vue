@@ -444,6 +444,7 @@ function historyStateRows(windowCode: string) {
     return [];
   }
   return Object.entries(stats.finalStateCount || {})
+    .filter(([state]) => state !== stats.currentState)
     .map(([state, count]) => ({ state, count }))
     .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
 }
@@ -456,6 +457,7 @@ function allHistoryRows(windowCode: string) {
     return [];
   }
   return Object.entries(stats.finalStateCount || {})
+    .filter(([state]) => state !== stats.currentState)
     .map(([state, count]) => ({
       state,
       count,
