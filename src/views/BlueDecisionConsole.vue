@@ -129,6 +129,9 @@
                   <th class="sortable" @click="sortHistory(window.windowCode, 'count')">
                     次数{{ sortMark(window.windowCode, 'count') }}
                   </th>
+                  <th class="sortable" @click="sortHistory(window.windowCode, 'currentYearCount')">
+                    今年次数{{ sortMark(window.windowCode, 'currentYearCount') }}
+                  </th>
                 </tr>
                 <tr v-else>
                   <th class="sortable" @click="sortHistory(window.windowCode, 'year')">
@@ -144,16 +147,21 @@
                   <tr v-for="row in allHistoryRows(window.windowCode)" :key="row.state">
                     <td>{{ row.state }}</td>
                     <td>{{ row.count }}</td>
+                    <td :class="{ 'current-year-cell': row.currentYearCount > 0 }">{{ row.currentYearCount }}</td>
                   </tr>
                 </template>
                 <template v-else>
-                  <tr v-for="row in historyYearRows(window.windowCode)" :key="row.year">
+                  <tr
+                    v-for="row in historyYearRows(window.windowCode)"
+                    :key="row.year"
+                    :class="{ 'current-year-row': row.year === currentHistoryYear }"
+                  >
                     <td>{{ row.year }}</td>
                     <td>{{ row.count }}</td>
                   </tr>
                 </template>
                 <tr v-if="historyTableEmpty(window.windowCode)">
-                  <td colspan="2" class="text-center text-text-secondary">暂无年度统计</td>
+                  <td :colspan="historyMode[window.windowCode] === 'all' ? 3 : 2" class="text-center text-text-secondary">暂无年度统计</td>
                 </tr>
               </tbody>
             </table>
@@ -319,9 +327,11 @@ const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const ballAdjust = reactive<Record<string, number>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
-const historySortField = reactive<Record<string, 'year' | 'state' | 'count'>>({});
+const historySortField = reactive<Record<string, HistorySortField>>({});
 const historySortAsc = reactive<Record<string, boolean>>({});
 const historyCollapsed = ref(false);
+
+type HistorySortField = 'year' | 'state' | 'count' | 'currentYearCount';
 const qiHaoList = ref<string[]>([]);
 const showQiHaoDropdown = ref(false);
 const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
@@ -438,13 +448,19 @@ function historyStateRows(windowCode: string) {
     .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
 }
 
+const currentHistoryYear = computed(() => String(prepare.value?.predictQiHao || predictQiHao.value).slice(0, 4));
+
 function allHistoryRows(windowCode: string) {
   const stats = historyStat(windowCode);
   if (!stats) {
     return [];
   }
   return Object.entries(stats.finalStateCount || {})
-    .map(([state, count]) => ({ state, count }))
+    .map(([state, count]) => ({
+      state,
+      count,
+      currentYearCount: Number(stats.finalStateYearCount?.[state]?.[currentHistoryYear.value] || 0)
+    }))
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
 }
 
@@ -459,7 +475,7 @@ function historyYearRows(windowCode: string) {
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
 }
 
-function sortHistory(windowCode: string, field: 'year' | 'state' | 'count') {
+function sortHistory(windowCode: string, field: HistorySortField) {
   if (historySortField[windowCode] === field) {
     historySortAsc[windowCode] = !historySortAsc[windowCode];
   } else {
@@ -474,20 +490,23 @@ function setHistoryMode(windowCode: string, mode: 'year' | 'all') {
   historySortAsc[windowCode] = mode !== 'all';
 }
 
-function sortMark(windowCode: string, field: 'year' | 'state' | 'count') {
+function sortMark(windowCode: string, field: HistorySortField) {
   return historySortField[windowCode] === field ? (historySortAsc[windowCode] ? ' ▲' : ' ▼') : '';
 }
 
 function compareHistoryRows(
   windowCode: string,
-  a: { year?: string; state?: string; count: number },
-  b: { year?: string; state?: string; count: number }
+  a: { year?: string; state?: string; count: number; currentYearCount?: number },
+  b: { year?: string; state?: string; count: number; currentYearCount?: number }
 ) {
   const field = historySortField[windowCode] || (historyMode[windowCode] === 'all' ? 'count' : 'year');
   const asc = historySortAsc[windowCode] ?? (field !== 'count');
   const direction = asc ? 1 : -1;
   if (field === 'count') {
     return (a.count - b.count) * direction;
+  }
+  if (field === 'currentYearCount') {
+    return ((a.currentYearCount || 0) - (b.currentYearCount || 0)) * direction;
   }
   if (field === 'state') {
     return String(a.state || '').localeCompare(String(b.state || '')) * direction;
@@ -687,5 +706,12 @@ onMounted(async () => {
 .state-tab.active {
   background: var(--color-accent);
   color: #ffffff;
+}
+
+.current-year-row td,
+.current-year-cell {
+  color: #ffffff;
+  font-weight: 700;
+  background: rgba(255, 71, 87, 0.22);
 }
 </style>
