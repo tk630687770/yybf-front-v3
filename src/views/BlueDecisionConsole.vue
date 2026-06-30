@@ -306,6 +306,7 @@
           <table class="decision-table">
             <thead>
               <tr>
+                <th>序号</th>
                 <th>蓝球</th>
                 <th>分</th>
                 <th>等级</th>
@@ -316,7 +317,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in scoreResult.scores" :key="row.number">
+              <tr v-for="(row, index) in scoreResult.scores" :key="row.number">
+                <td>{{ index + 1 }}</td>
                 <td class="font-bold">
                   <span :class="{ 'actual-blue-hit': isActualBlue(row.number) }">{{ row.number }}</span>
                 </td>
@@ -676,9 +678,14 @@ async function newManualSample() {
   forcedNumbers.value = [];
   excludedNumbers.value = [];
   selectedBlue.value = [];
-  sampleName.value = `人工方案-${predictQiHao.value}`;
+  sampleName.value = nextManualSampleName();
   manualDirty.value = false;
   await run(async () => runManualScore());
+}
+
+function nextManualSampleName() {
+  const count = snapshots.value.filter(snapshot => snapshot.decisionMode === 'MANUAL').length;
+  return `${predictQiHao.value}-${count + 1}`;
 }
 
 function sourceKey(type: string, windowCode?: string | null, level?: number | null) {
@@ -694,11 +701,12 @@ function sourceEnabled(type: string, windowCode?: string | null, level?: number 
 }
 
 function sourceDecision(type: string, windowCode?: string | null, level?: number | null) {
-  return findSource(type, windowCode, level)?.decisionType || '观察';
+  return findSource(type, windowCode, level)?.decisionType || '排除';
 }
 
 function sourceScore(type: string, windowCode?: string | null, level?: number | null) {
-  return findSource(type, windowCode, level)?.score ?? 0.5;
+  const source = findSource(type, windowCode, level);
+  return source?.score ?? defaultSourceScore(source?.decisionType);
 }
 
 async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, event: Event) {
@@ -710,7 +718,7 @@ async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowC
   const key = sourceKey(type, windowCode, level);
   const sources = manualDraft.value.sources || [];
   manualDraft.value.sources = checked
-    ? [...sources, { sourceType: type, windowCode, level, decisionType: '观察', score: 0.5 }]
+    ? [...sources, { sourceType: type, windowCode, level, decisionType: '排除', score: defaultSourceScore('排除') }]
     : sources.filter(source => sourceKey(source.sourceType, source.windowCode, source.level) !== key);
   await run(async () => runManualScore());
 }
@@ -719,8 +727,17 @@ async function updateSource(type: BlueDecisionScoreSource['sourceType'], windowC
   const source = findSource(type, windowCode, level);
   if (!source) return;
   if (field === 'score') source.score = Number((event.target as HTMLInputElement).value || 0);
-  else source.decisionType = (event.target as HTMLSelectElement).value as BlueDecisionScoreSource['decisionType'];
+  else {
+    source.decisionType = (event.target as HTMLSelectElement).value as BlueDecisionScoreSource['decisionType'];
+    source.score = defaultSourceScore(source.decisionType);
+  }
   await run(async () => runManualScore());
+}
+
+function defaultSourceScore(decisionType?: string | null) {
+  if (decisionType === '选择') return 1;
+  if (decisionType === '观察') return 0.5;
+  return -0.5;
 }
 
 async function updateBallAdjust(number: string, event: Event) {

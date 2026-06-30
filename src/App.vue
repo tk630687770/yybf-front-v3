@@ -17,6 +17,7 @@
             基础窗口操作台
           </RouterLink>
           <RouterLink
+            v-if="false"
             to="/prediction-console"
             class="nav-link"
             active-class="nav-link-active"
@@ -24,6 +25,7 @@
             实时预测台
           </RouterLink>
           <RouterLink
+            v-if="false"
             to="/snapshot-review"
             class="nav-link"
             active-class="nav-link-active"
@@ -31,6 +33,7 @@
             快照复盘台
           </RouterLink>
           <RouterLink
+            v-if="false"
             to="/diagnostic-lab"
             class="nav-link"
             active-class="nav-link-active"
@@ -38,6 +41,7 @@
             诊断研究台
           </RouterLink>
           <RouterLink
+            v-if="false"
             to="/historical-replay-lab"
             class="nav-link"
             active-class="nav-link-active"
@@ -45,6 +49,7 @@
             历史回放实验台
           </RouterLink>
           <RouterLink
+            v-if="false"
             to="/entry-recall-lab"
             class="nav-link"
             active-class="nav-link-active"
