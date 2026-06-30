@@ -99,6 +99,7 @@ export async function scoreBlueDecision(
 }
 
 export async function saveBlueDecision(payload: {
+  id?: number | null;
   predictQiHao: string;
   sampleName: string;
   decisionMode: Exclude<BlueDecisionMode, 'LEGACY'>;
@@ -106,6 +107,25 @@ export async function saveBlueDecision(payload: {
   selectedBlue: string[];
 }): Promise<BlueDecisionSnapshot> {
   const response = await request.post('/ssq/window/decision/blue/snapshot/save', payload);
+  return unwrapResponse<BlueDecisionSnapshot>(response);
+}
+
+export async function updateBlueDecision(
+  id: number,
+  payload: {
+    predictQiHao: string;
+    sampleName: string;
+    decisionMode: Exclude<BlueDecisionMode, 'LEGACY'>;
+    manualAdjust: BlueDecisionManualAdjust | null;
+    selectedBlue: string[];
+  }
+): Promise<BlueDecisionSnapshot> {
+  const response = await request.post(`/ssq/window/decision/blue/snapshot/${id}/update`, payload);
+  return unwrapResponse<BlueDecisionSnapshot>(response);
+}
+
+export async function renameBlueDecision(id: number, sampleName: string): Promise<BlueDecisionSnapshot> {
+  const response = await request.post(`/ssq/window/decision/blue/snapshot/${id}/rename`, { sampleName });
   return unwrapResponse<BlueDecisionSnapshot>(response);
 }
 

@@ -280,7 +280,8 @@
           </div>
           <button class="btn" :disabled="loading" @click="newManualSample">新建样本</button>
           <input v-model="sampleName" class="field w-40" :disabled="decisionMode === 'SYSTEM'" placeholder="样本名称" />
-          <button class="btn primary" :disabled="loading" @click="saveSnapshot">保存样本</button>
+          <button class="btn primary" :disabled="loading" @click="createSnapshot">新增样本</button>
+          <button class="btn" :disabled="loading || editingSnapshotId === null" @click="updateSnapshot">修改样本</button>
           <button class="btn" :disabled="loading" @click="loadSnapshots">读取样本</button>
           <button class="btn" :disabled="loading" @click="reviewBatch">批量复盘</button>
         </div>
@@ -398,7 +399,14 @@
               <td><input v-model="selectedSnapshotIds" type="checkbox" :value="snapshot.id" /></td>
               <td>{{ snapshot.id }}</td>
               <td>{{ snapshot.predictQiHao }}</td>
-              <td>{{ snapshot.sampleName }}</td>
+              <td>
+                <input
+                  class="field sample-name-field"
+                  :value="snapshot.sampleName"
+                  @change="renameSnapshot(snapshot, $event)"
+                  @keyup.enter="renameSnapshot(snapshot, $event)"
+                />
+              </td>
               <td>{{ modeLabel(snapshot.decisionMode) }}</td>
               <td class="font-bold">{{ snapshot.selectedBlue.join(',') }}</td>
               <td class="text-ball-blue">{{ snapshot.candidateBlue.join(',') }}</td>
@@ -439,8 +447,10 @@ import {
   prepareBlueDecision,
   reviewBlueDecision,
   reviewBlueDecisionBatch,
+  renameBlueDecision,
   saveBlueDecision,
   scoreBlueDecision,
+  updateBlueDecision,
   type BlueDecisionPrepare,
   type BlueDecisionWindow,
   type BlueDecisionLevel,
@@ -471,6 +481,7 @@ const forcedNumbers = ref<string[]>([]);
 const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const selectedSnapshotIds = ref<number[]>([]);
+const editingSnapshotId = ref<number | null>(null);
 const pendingSourceDrafts = reactive<Record<string, { decisionType: BlueDecisionScoreSource['decisionType']; score: number }>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
@@ -546,6 +557,7 @@ async function loadPrepare() {
     manualDraft.value = null;
     manualScore.value = null;
     manualDirty.value = false;
+    editingSnapshotId.value = null;
     decisionMode.value = 'SYSTEM';
     await runSystemScore();
     await loadSnapshots();
@@ -581,22 +593,44 @@ async function runManualScore() {
   manualDirty.value = true;
 }
 
-async function saveSnapshot() {
+function snapshotPayload() {
+  return {
+    predictQiHao: predictQiHao.value,
+    sampleName: sampleName.value,
+    decisionMode: decisionMode.value,
+    manualAdjust: decisionMode.value === 'MANUAL' ? currentManualAdjust() : null,
+    selectedBlue: selectedBlue.value
+  };
+}
+
+async function createSnapshot() {
   if (decisionMode.value === 'MANUAL' && !manualDraft.value) {
     setMessage('请先新建人工样本', 'error');
     return;
   }
   await run(async () => {
-    await saveBlueDecision({
-      predictQiHao: predictQiHao.value,
-      sampleName: sampleName.value,
-      decisionMode: decisionMode.value,
-      manualAdjust: decisionMode.value === 'MANUAL' ? currentManualAdjust() : null,
-      selectedBlue: selectedBlue.value
-    });
+    const saved = await saveBlueDecision(snapshotPayload());
+    editingSnapshotId.value = saved.id;
     manualDirty.value = false;
     await loadSnapshots();
-    setMessage('样本已保存');
+    setMessage('样本已新增');
+  });
+}
+
+async function updateSnapshot() {
+  if (editingSnapshotId.value === null) {
+    setMessage('请先回显一个样本', 'error');
+    return;
+  }
+  if (decisionMode.value === 'MANUAL' && !manualDraft.value) {
+    setMessage('请先新建人工样本', 'error');
+    return;
+  }
+  await run(async () => {
+    await updateBlueDecision(editingSnapshotId.value!, snapshotPayload());
+    manualDirty.value = false;
+    await loadSnapshots();
+    setMessage('样本已修改');
   });
 }
 
@@ -621,6 +655,23 @@ async function reviewBatch() {
   });
 }
 
+async function renameSnapshot(snapshot: BlueDecisionSnapshot, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const nextName = input.value.trim();
+  if (!nextName || nextName === snapshot.sampleName) {
+    input.value = snapshot.sampleName;
+    return;
+  }
+  await run(async () => {
+    await renameBlueDecision(snapshot.id, nextName);
+    await loadSnapshots();
+    if (editingSnapshotId.value === snapshot.id) {
+      sampleName.value = nextName;
+    }
+    setMessage('样本名称已修改');
+  });
+}
+
 async function deleteSelectedSnapshots() {
   await deleteSnapshots(selectedSnapshotIds.value);
 }
@@ -641,6 +692,7 @@ async function echoSnapshot(snapshot: BlueDecisionSnapshot) {
   await run(async () => {
     const detail = await getBlueDecision(snapshot.id);
     Object.keys(pendingSourceDrafts).forEach(key => delete pendingSourceDrafts[key]);
+    editingSnapshotId.value = detail.id;
     sampleName.value = detail.sampleName;
     selectedBlue.value = [...detail.selectedBlue];
     if (detail.decisionMode === 'MANUAL' && detail.scoreResult?.manualAdjust) {
@@ -681,6 +733,7 @@ async function newManualSample() {
   excludedNumbers.value = [];
   selectedBlue.value = [];
   Object.keys(pendingSourceDrafts).forEach(key => delete pendingSourceDrafts[key]);
+  editingSnapshotId.value = null;
   sampleName.value = nextManualSampleName();
   manualDirty.value = false;
   await run(async () => runManualScore());
@@ -1134,6 +1187,11 @@ onMounted(async () => {
 .score-field {
   width: 58px;
   padding: 4px 5px;
+}
+
+.sample-name-field {
+  min-width: 120px;
+  padding: 4px 6px;
 }
 
 .level-title {
