@@ -701,12 +701,12 @@ function sourceEnabled(type: string, windowCode?: string | null, level?: number 
 }
 
 function sourceDecision(type: string, windowCode?: string | null, level?: number | null) {
-  return findSource(type, windowCode, level)?.decisionType || '排除';
+  return findSource(type, windowCode, level)?.decisionType || defaultDecisionType(type);
 }
 
 function sourceScore(type: string, windowCode?: string | null, level?: number | null) {
   const source = findSource(type, windowCode, level);
-  return source?.score ?? defaultSourceScore(source?.decisionType);
+  return source?.score ?? defaultSourceScore(defaultDecisionType(type));
 }
 
 async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, event: Event) {
@@ -739,6 +739,10 @@ function defaultSourceScore(decisionType?: string | null) {
   if (decisionType === '选择') return 1;
   if (decisionType === '观察') return 0.5;
   return -0.5;
+}
+
+function defaultDecisionType(type: string) {
+  return type === 'WINDOW_LEVEL' ? '观察' : '排除';
 }
 
 async function updateBallAdjust(number: string, event: Event) {
