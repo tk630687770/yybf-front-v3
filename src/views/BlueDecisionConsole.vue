@@ -640,6 +640,7 @@ async function deleteSnapshots(ids: number[]) {
 async function echoSnapshot(snapshot: BlueDecisionSnapshot) {
   await run(async () => {
     const detail = await getBlueDecision(snapshot.id);
+    Object.keys(pendingSourceDrafts).forEach(key => delete pendingSourceDrafts[key]);
     sampleName.value = detail.sampleName;
     selectedBlue.value = [...detail.selectedBlue];
     if (detail.decisionMode === 'MANUAL' && detail.scoreResult?.manualAdjust) {
