@@ -1,11 +1,20 @@
 import { request } from '../request';
 
 export interface BlueDecisionManualAdjust {
-  windowWeights?: Record<string, number>;
-  levelAdjust?: Record<string, number>;
+  sources?: BlueDecisionScoreSource[];
   ballAdjust?: Record<string, number>;
   forcedNumbers?: string[];
   excludedNumbers?: string[];
+}
+
+export type BlueDecisionMode = 'SYSTEM' | 'MANUAL' | 'LEGACY';
+
+export interface BlueDecisionScoreSource {
+  sourceType: 'WINDOW_LEVEL' | 'PREVIOUS_BLUE' | 'PREVIOUS_NEIGHBOR' | 'WILL_DOWN';
+  windowCode?: string | null;
+  level?: number | null;
+  decisionType: '选择' | '观察' | '排除';
+  score: number;
 }
 
 export interface BlueDecisionLevel {
@@ -33,6 +42,7 @@ export interface BlueDecisionPrepare {
   sourceQiHao: string;
   windows: BlueDecisionWindow[];
   historyStats: Record<string, BlueDecisionHistoryStat>;
+  fixedSources: Record<string, string[]>;
 }
 
 export interface BlueBallScore {
@@ -44,6 +54,7 @@ export interface BlueBallScore {
 }
 
 export interface BlueDecisionScore {
+  decisionMode: BlueDecisionMode;
   prepare: BlueDecisionPrepare;
   systemWeights: Record<string, number>;
   manualAdjust: BlueDecisionManualAdjust | null;
@@ -55,6 +66,7 @@ export interface BlueDecisionSnapshot {
   id: number;
   predictQiHao: string;
   sampleName: string;
+  decisionMode: BlueDecisionMode;
   selectedBlue: string[];
   candidateBlue: string[];
   actualBlue: string | null;
@@ -75,10 +87,12 @@ export async function prepareBlueDecision(predictQiHao: string): Promise<BlueDec
 
 export async function scoreBlueDecision(
   predictQiHao: string,
-  manualAdjust: BlueDecisionManualAdjust
+  decisionMode: Exclude<BlueDecisionMode, 'LEGACY'>,
+  manualAdjust: BlueDecisionManualAdjust | null
 ): Promise<BlueDecisionScore> {
   const response = await request.post('/ssq/window/decision/blue/score', {
     predictQiHao,
+    decisionMode,
     manualAdjust
   });
   return unwrapResponse<BlueDecisionScore>(response);
@@ -87,7 +101,8 @@ export async function scoreBlueDecision(
 export async function saveBlueDecision(payload: {
   predictQiHao: string;
   sampleName: string;
-  manualAdjust: BlueDecisionManualAdjust;
+  decisionMode: Exclude<BlueDecisionMode, 'LEGACY'>;
+  manualAdjust: BlueDecisionManualAdjust | null;
   selectedBlue: string[];
 }): Promise<BlueDecisionSnapshot> {
   const response = await request.post('/ssq/window/decision/blue/snapshot/save', payload);
@@ -99,6 +114,11 @@ export async function listBlueDecision(predictQiHao: string): Promise<BlueDecisi
     params: { predictQiHao }
   });
   return unwrapResponse<BlueDecisionSnapshot[]>(response);
+}
+
+export async function getBlueDecision(id: number): Promise<BlueDecisionSnapshot> {
+  const response = await request.get(`/ssq/window/decision/blue/snapshot/${id}`);
+  return unwrapResponse<BlueDecisionSnapshot>(response);
 }
 
 export async function reviewBlueDecision(id: number): Promise<BlueDecisionSnapshot> {

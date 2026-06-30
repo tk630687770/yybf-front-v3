@@ -55,7 +55,12 @@
           <span class="text-xs text-text-secondary">状态：{{ window.stateText }}</span>
         </div>
         <div class="mt-3 space-y-2">
-          <div v-for="level in displayLevels(window)" :key="level.level" class="level-row">
+          <div
+            v-for="level in displayLevels(window)"
+            :key="level.level"
+            class="level-row"
+            :class="{ 'active-source-row': decisionMode === 'MANUAL' && sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level) }"
+          >
             <div class="level-title">lv{{ level.level }}</div>
             <div class="flex flex-wrap gap-1">
               <span
@@ -68,7 +73,15 @@
                 }"
               >
                 {{ number }}{{ level.willDownNumbers.includes(number) ? '↓' : '' }}{{ showDrawBlue && isHitBlue(level, number) ? '★' : '' }}
+                <small v-if="decisionMode === 'MANUAL' && manualDraft" class="ball-score">{{ signedScore(activeScore(number)) }}</small>
               </span>
+            </div>
+            <div v-if="decisionMode === 'MANUAL' && manualDraft" class="source-controls">
+              <input type="checkbox" :checked="sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" @change="toggleSource('WINDOW_LEVEL', window.windowCode, level.level, $event)" />
+              <select class="field compact-field" :disabled="!sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" :value="sourceDecision('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'decisionType', $event)">
+                <option>选择</option><option>观察</option><option>排除</option>
+              </select>
+              <input class="field score-field" type="number" step="0.5" :disabled="!sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" :value="sourceScore('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'score', $event)" />
             </div>
           </div>
         </div>
@@ -254,21 +267,41 @@
       </div>
     </section>
 
-    <section v-if="scoreResult" class="decision-card">
+    <section v-if="prepare" class="decision-card">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="font-bold">蓝球评分与人工调整</h2>
-          <p class="text-xs text-text-secondary">勾选“保留/排除”后重新评分；最终选择用于保存样本。</p>
+          <h2 class="font-bold">蓝球评分方案</h2>
+          <p class="text-xs text-text-secondary">系统默认只读；人工方案从空白分源开始，两套结果互不影响。</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <input v-model="sampleName" class="field w-40" placeholder="样本名称" />
+          <div class="segmented">
+            <button class="state-tab compact" :class="{ active: decisionMode === 'SYSTEM' }" @click="switchDecisionMode('SYSTEM')">系统默认</button>
+            <button class="state-tab compact" :class="{ active: decisionMode === 'MANUAL' }" @click="switchDecisionMode('MANUAL')">人工方案</button>
+          </div>
+          <button class="btn" :disabled="loading" @click="newManualSample">新建样本</button>
+          <input v-model="sampleName" class="field w-40" :disabled="decisionMode === 'SYSTEM'" placeholder="样本名称" />
           <button class="btn primary" :disabled="loading" @click="saveSnapshot">保存样本</button>
           <button class="btn" :disabled="loading" @click="loadSnapshots">读取样本</button>
           <button class="btn" :disabled="loading" @click="reviewBatch">批量复盘</button>
         </div>
       </div>
 
-      <div class="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
+      <div v-if="decisionMode === 'MANUAL' && !manualDraft" class="empty-manual mt-3">
+        当前没有人工方案，请点击“新建样本”后再选择窗口等级或其他分数来源。
+      </div>
+
+      <div v-if="decisionMode === 'MANUAL' && manualDraft" class="mt-3 fixed-source-grid">
+        <label v-for="source in fixedSourceOptions" :key="source.key" class="fixed-source-card">
+          <span><input type="checkbox" :checked="sourceEnabled(source.type, source.windowCode)" @change="toggleSource(source.type, source.windowCode, null, $event)" /> {{ source.label }}</span>
+          <small>{{ source.numbers.join(',') || '无号码' }}</small>
+          <select class="field compact-field" :disabled="!sourceEnabled(source.type, source.windowCode)" :value="sourceDecision(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'decisionType', $event)">
+            <option>选择</option><option>观察</option><option>排除</option>
+          </select>
+          <input class="field score-field" type="number" step="0.5" :disabled="!sourceEnabled(source.type, source.windowCode)" :value="sourceScore(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'score', $event)" />
+        </label>
+      </div>
+
+      <div v-if="scoreResult" class="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
         <div class="table-wrap">
           <table class="decision-table">
             <thead>
@@ -289,9 +322,9 @@
                 </td>
                 <td>{{ row.score }}</td>
                 <td>{{ row.grade }}</td>
-                <td><input v-model="selectedBlue" type="checkbox" :value="row.number" /></td>
-                <td><input v-model="forcedNumbers" type="checkbox" :value="row.number" /></td>
-                <td><input v-model="excludedNumbers" type="checkbox" :value="row.number" /></td>
+                <td><input v-model="selectedBlue" type="checkbox" :disabled="decisionMode === 'SYSTEM'" :value="row.number" /></td>
+                <td><input :checked="forcedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('forced', row.number, $event)" /></td>
+                <td><input :checked="excludedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('excluded', row.number, $event)" /></td>
                 <td class="text-xs text-text-secondary">{{ row.reasons.join('；') }}</td>
               </tr>
             </tbody>
@@ -299,7 +332,7 @@
         </div>
 
         <div class="space-y-3">
-          <div class="summary-box">
+          <div v-if="decisionMode === 'MANUAL' && manualDraft" class="summary-box">
             <div class="summary-label">系统候选</div>
             <div class="summary-value">
               <template v-for="(number, index) in scoreResult.candidateBlue" :key="number">
@@ -323,7 +356,7 @@
             <div class="grid grid-cols-4 gap-2">
               <label v-for="n in allBlueNumbers" :key="n" class="text-xs">
                 {{ n }}
-                <input v-model.number="ballAdjust[n]" class="field mt-1 w-full" type="number" step="0.5" />
+                <input :value="ballAdjustValue(n)" class="field mt-1 w-full" type="number" step="0.5" @change="updateBallAdjust(n, $event)" />
               </label>
             </div>
           </div>
@@ -349,6 +382,7 @@
               <th>ID</th>
               <th>期号</th>
               <th>样本</th>
+              <th>类型</th>
               <th>选择</th>
               <th>候选</th>
               <th>开奖</th>
@@ -363,6 +397,7 @@
               <td>{{ snapshot.id }}</td>
               <td>{{ snapshot.predictQiHao }}</td>
               <td>{{ snapshot.sampleName }}</td>
+              <td>{{ modeLabel(snapshot.decisionMode) }}</td>
               <td class="font-bold">{{ snapshot.selectedBlue.join(',') }}</td>
               <td class="text-ball-blue">{{ snapshot.candidateBlue.join(',') }}</td>
               <td>{{ snapshot.actualBlue || '--' }}</td>
@@ -377,7 +412,7 @@
               </td>
             </tr>
             <tr v-if="snapshots.length === 0">
-              <td colspan="10" class="text-center text-text-secondary">暂无样本</td>
+              <td colspan="11" class="text-center text-text-secondary">暂无样本</td>
             </tr>
           </tbody>
         </table>
@@ -397,6 +432,7 @@ import { useLotteryStore } from '@/stores/lottery';
 import { db } from '@/composables/useDatabase';
 import {
   deleteBlueDecisionSnapshots,
+  getBlueDecision,
   listBlueDecision,
   prepareBlueDecision,
   reviewBlueDecision,
@@ -407,6 +443,9 @@ import {
   type BlueDecisionWindow,
   type BlueDecisionLevel,
   type BlueDecisionHistoryStat,
+  type BlueDecisionManualAdjust,
+  type BlueDecisionMode,
+  type BlueDecisionScoreSource,
   type BlueDecisionScore,
   type BlueDecisionSnapshot
 } from '@/api/modules/blueDecision';
@@ -420,12 +459,16 @@ const messageType = ref<'ok' | 'error'>('ok');
 const showDrawBlue = ref(false);
 const prepare = ref<BlueDecisionPrepare | null>(null);
 const scoreResult = ref<BlueDecisionScore | null>(null);
+const systemScore = ref<BlueDecisionScore | null>(null);
+const manualScore = ref<BlueDecisionScore | null>(null);
+const decisionMode = ref<'SYSTEM' | 'MANUAL'>('SYSTEM');
+const manualDraft = ref<BlueDecisionManualAdjust | null>(null);
+const manualDirty = ref(false);
 const selectedBlue = ref<string[]>([]);
 const forcedNumbers = ref<string[]>([]);
 const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const selectedSnapshotIds = ref<number[]>([]);
-const ballAdjust = reactive<Record<string, number>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
 const historySortField = reactive<Record<string, HistorySortField>>({});
@@ -458,42 +501,97 @@ const qiHaoSuggestions = computed(() => {
     .slice(0, 20);
 });
 
-function manualAdjust() {
+const fixedSourceOptions = computed<Array<{
+  key: string;
+  type: BlueDecisionScoreSource['sourceType'];
+  windowCode: string | null;
+  label: string;
+  numbers: string[];
+}>>(() => {
+  if (!prepare.value) return [];
+  const base: Array<{ key: string; type: BlueDecisionScoreSource['sourceType']; windowCode: string | null; label: string; numbers: string[] }> = [
+    { key: 'PREVIOUS_BLUE', type: 'PREVIOUS_BLUE' as const, windowCode: null, label: '上期蓝球', numbers: prepare.value.fixedSources?.PREVIOUS_BLUE || [] },
+    { key: 'PREVIOUS_NEIGHBOR', type: 'PREVIOUS_NEIGHBOR' as const, windowCode: null, label: '上期邻号', numbers: prepare.value.fixedSources?.PREVIOUS_NEIGHBOR || [] }
+  ];
+  return [...base, ...prepare.value.windows.map(window => ({
+    key: `WILL_DOWN:${window.windowCode}`,
+    type: 'WILL_DOWN' as const,
+    windowCode: window.windowCode,
+    label: `${window.windowName}即将降级`,
+    numbers: window.levels.flatMap(level => level.willDownNumbers || [])
+  }))];
+});
+
+function currentManualAdjust(): BlueDecisionManualAdjust | null {
+  if (!manualDraft.value) return null;
   return {
-    windowWeights: {},
-    levelAdjust: {},
-    ballAdjust: Object.fromEntries(Object.entries(ballAdjust).filter(([, value]) => Number(value) !== 0)),
+    sources: manualDraft.value.sources || [],
+    ballAdjust: Object.fromEntries(Object.entries(manualDraft.value.ballAdjust || {}).filter(([, value]) => Number(value) !== 0)),
     forcedNumbers: forcedNumbers.value,
     excludedNumbers: excludedNumbers.value
   };
 }
 
 async function loadPrepare() {
+  if (manualDirty.value && prepare.value?.predictQiHao !== predictQiHao.value && !window.confirm('当前人工方案尚未保存，确认切换期号？')) {
+    predictQiHao.value = prepare.value?.predictQiHao || predictQiHao.value;
+    return;
+  }
   await run(async () => {
     prepare.value = await prepareBlueDecision(predictQiHao.value);
     resetHistoryTabs();
-    await runScore();
+    manualDraft.value = null;
+    manualScore.value = null;
+    manualDirty.value = false;
+    decisionMode.value = 'SYSTEM';
+    await runSystemScore();
     await loadSnapshots();
     setMessage('窗口读取完成');
   });
 }
 
 async function runScore() {
-  await run(async () => {
-    scoreResult.value = await scoreBlueDecision(predictQiHao.value, manualAdjust());
-    selectedBlue.value = [...scoreResult.value.candidateBlue.slice(0, 2)];
-    setMessage('评分完成');
-  });
+  if (decisionMode.value === 'MANUAL') {
+    if (!manualDraft.value) {
+      setMessage('请先新建人工样本', 'error');
+      return;
+    }
+    await runManualScore();
+    return;
+  }
+  await run(async () => runSystemScore());
+}
+
+async function runSystemScore() {
+  systemScore.value = await scoreBlueDecision(predictQiHao.value, 'SYSTEM', null);
+  scoreResult.value = systemScore.value;
+  sampleName.value = '系统默认';
+  selectedBlue.value = [...systemScore.value.candidateBlue.slice(0, 2)];
+  forcedNumbers.value = [];
+  excludedNumbers.value = [];
+}
+
+async function runManualScore() {
+  if (!manualDraft.value) return;
+  manualScore.value = await scoreBlueDecision(predictQiHao.value, 'MANUAL', currentManualAdjust());
+  scoreResult.value = manualScore.value;
+  manualDirty.value = true;
 }
 
 async function saveSnapshot() {
+  if (decisionMode.value === 'MANUAL' && !manualDraft.value) {
+    setMessage('请先新建人工样本', 'error');
+    return;
+  }
   await run(async () => {
     await saveBlueDecision({
       predictQiHao: predictQiHao.value,
       sampleName: sampleName.value,
-      manualAdjust: manualAdjust(),
+      decisionMode: decisionMode.value,
+      manualAdjust: decisionMode.value === 'MANUAL' ? currentManualAdjust() : null,
       selectedBlue: selectedBlue.value
     });
+    manualDirty.value = false;
     await loadSnapshots();
     setMessage('样本已保存');
   });
@@ -536,10 +634,128 @@ async function deleteSnapshots(ids: number[]) {
   });
 }
 
-function echoSnapshot(snapshot: BlueDecisionSnapshot) {
-  sampleName.value = snapshot.sampleName;
-  selectedBlue.value = [...snapshot.selectedBlue];
-  setMessage(`已回显样本 ${snapshot.id}`);
+async function echoSnapshot(snapshot: BlueDecisionSnapshot) {
+  await run(async () => {
+    const detail = await getBlueDecision(snapshot.id);
+    sampleName.value = detail.sampleName;
+    selectedBlue.value = [...detail.selectedBlue];
+    if (detail.decisionMode === 'MANUAL' && detail.scoreResult?.manualAdjust) {
+      decisionMode.value = 'MANUAL';
+      manualDraft.value = detail.scoreResult.manualAdjust;
+      forcedNumbers.value = [...(manualDraft.value.forcedNumbers || [])];
+      excludedNumbers.value = [...(manualDraft.value.excludedNumbers || [])];
+      manualScore.value = detail.scoreResult;
+      scoreResult.value = manualScore.value;
+    } else {
+      decisionMode.value = 'SYSTEM';
+      scoreResult.value = detail.scoreResult || systemScore.value;
+    }
+    manualDirty.value = false;
+    setMessage(`已回显样本 ${snapshot.id}`);
+  });
+}
+
+function switchDecisionMode(mode: 'SYSTEM' | 'MANUAL') {
+  decisionMode.value = mode;
+  if (mode === 'SYSTEM') {
+    scoreResult.value = systemScore.value;
+    sampleName.value = '系统默认';
+    selectedBlue.value = [...(systemScore.value?.candidateBlue.slice(0, 2) || [])];
+    return;
+  }
+  scoreResult.value = manualScore.value;
+  if (!manualDraft.value) {
+    setMessage('请先新建人工样本', 'error');
+  }
+}
+
+async function newManualSample() {
+  if (manualDirty.value && !window.confirm('当前人工方案尚未保存，确认新建空白样本？')) return;
+  decisionMode.value = 'MANUAL';
+  manualDraft.value = { sources: [], ballAdjust: {}, forcedNumbers: [], excludedNumbers: [] };
+  forcedNumbers.value = [];
+  excludedNumbers.value = [];
+  selectedBlue.value = [];
+  sampleName.value = `人工方案-${predictQiHao.value}`;
+  manualDirty.value = false;
+  await run(async () => runManualScore());
+}
+
+function sourceKey(type: string, windowCode?: string | null, level?: number | null) {
+  return `${type}:${windowCode || ''}:${level ?? ''}`;
+}
+
+function findSource(type: string, windowCode?: string | null, level?: number | null) {
+  return manualDraft.value?.sources?.find(source => sourceKey(source.sourceType, source.windowCode, source.level) === sourceKey(type, windowCode, level));
+}
+
+function sourceEnabled(type: string, windowCode?: string | null, level?: number | null) {
+  return Boolean(findSource(type, windowCode, level));
+}
+
+function sourceDecision(type: string, windowCode?: string | null, level?: number | null) {
+  return findSource(type, windowCode, level)?.decisionType || '观察';
+}
+
+function sourceScore(type: string, windowCode?: string | null, level?: number | null) {
+  return findSource(type, windowCode, level)?.score ?? 0.5;
+}
+
+async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, event: Event) {
+  if (!manualDraft.value) {
+    setMessage('请先新建人工样本', 'error');
+    return;
+  }
+  const checked = (event.target as HTMLInputElement).checked;
+  const key = sourceKey(type, windowCode, level);
+  const sources = manualDraft.value.sources || [];
+  manualDraft.value.sources = checked
+    ? [...sources, { sourceType: type, windowCode, level, decisionType: '观察', score: 0.5 }]
+    : sources.filter(source => sourceKey(source.sourceType, source.windowCode, source.level) !== key);
+  await run(async () => runManualScore());
+}
+
+async function updateSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, field: 'decisionType' | 'score', event: Event) {
+  const source = findSource(type, windowCode, level);
+  if (!source) return;
+  if (field === 'score') source.score = Number((event.target as HTMLInputElement).value || 0);
+  else source.decisionType = (event.target as HTMLSelectElement).value as BlueDecisionScoreSource['decisionType'];
+  await run(async () => runManualScore());
+}
+
+async function updateBallAdjust(number: string, event: Event) {
+  if (!manualDraft.value) return;
+  manualDraft.value.ballAdjust = { ...(manualDraft.value.ballAdjust || {}), [number]: Number((event.target as HTMLInputElement).value || 0) };
+  await run(async () => runManualScore());
+}
+
+async function toggleConstraint(kind: 'forced' | 'excluded', number: string, event: Event) {
+  if (!manualDraft.value) {
+    setMessage('请先新建人工样本', 'error');
+    return;
+  }
+  const checked = (event.target as HTMLInputElement).checked;
+  const target = kind === 'forced' ? forcedNumbers : excludedNumbers;
+  const opposite = kind === 'forced' ? excludedNumbers : forcedNumbers;
+  target.value = checked ? [...new Set([...target.value, number])] : target.value.filter(item => item !== number);
+  if (checked) opposite.value = opposite.value.filter(item => item !== number);
+  await run(async () => runManualScore());
+}
+
+function activeScore(number: string) {
+  return scoreResult.value?.scores.find(score => score.number === number)?.score || 0;
+}
+
+function ballAdjustValue(number: string) {
+  return manualDraft.value?.ballAdjust?.[number] || 0;
+}
+
+function signedScore(score: number) {
+  return `${score > 0 ? '+' : ''}${trimNumber(score)}`;
+}
+
+function modeLabel(mode: BlueDecisionMode) {
+  return mode === 'SYSTEM' ? '系统默认' : mode === 'MANUAL' ? '人工方案' : '旧版样本';
 }
 
 function displayLevels(window: BlueDecisionWindow): BlueDecisionLevel[] {
@@ -825,9 +1041,31 @@ onMounted(async () => {
 
 .level-row {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: start;
+}
+
+.active-source-row {
+  border-radius: 6px;
+  background: rgba(255, 71, 87, 0.12);
+  padding: 4px;
+}
+
+.source-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.compact-field {
+  width: 64px;
+  padding: 4px 5px;
+}
+
+.score-field {
+  width: 58px;
+  padding: 4px 5px;
 }
 
 .level-title {
@@ -841,6 +1079,41 @@ onMounted(async () => {
   padding: 3px 7px;
   color: #dfe5ff;
   font-size: 12px;
+}
+
+.ball-score {
+  margin-left: 3px;
+  color: #ffffff;
+  font-size: 9px;
+}
+
+.fixed-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.fixed-source-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(234, 234, 234, 0.1);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.fixed-source-card small {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+}
+
+.empty-manual {
+  border: 1px dashed rgba(234, 234, 234, 0.2);
+  border-radius: 6px;
+  padding: 16px;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 .blue-pill.down {
