@@ -793,14 +793,13 @@ function historyStateRows(windowCode: string) {
   if (!stats) {
     return [];
   }
-  return Object.entries(stats.finalStateCount || {})
-    .filter(([state]) => state !== stats.currentState)
-    .map(([state, count]) => ({
+  return possibleHistoryStates(windowCode)
+    .map(state => ({
       state,
-      count,
+      count: Number(stats.finalStateCount?.[state] || 0),
       currentYearCount: currentYearCount(stats, state)
     }))
-    .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
+    .sort(compareStateLevel);
 }
 
 const currentHistoryYear = computed(() => String(prepare.value?.predictQiHao || predictQiHao.value).slice(0, 4));
@@ -810,14 +809,37 @@ function allHistoryRows(windowCode: string) {
   if (!stats) {
     return [];
   }
-  return Object.entries(stats.finalStateCount || {})
-    .filter(([state]) => state !== stats.currentState)
-    .map(([state, count]) => ({
+  return possibleHistoryStates(windowCode)
+    .map(state => ({
       state,
-      count,
+      count: Number(stats.finalStateCount?.[state] || 0),
       currentYearCount: currentYearCount(stats, state)
     }))
     .sort((a, b) => compareHistoryRows(windowCode, a, b));
+}
+
+function possibleHistoryStates(windowCode: string) {
+  const stats = historyStat(windowCode);
+  const states = new Set(Object.keys(stats?.finalStateCount || {}).filter(state => state !== stats?.currentState));
+  const window = prepare.value?.windows?.find(item => item.windowCode === windowCode);
+  (window?.levels || [])
+    .filter(level => (level.numbers || []).length > 0)
+    .map(level => stateWithHit(window?.stateText || stats?.currentState || '', level.level))
+    .filter(Boolean)
+    .forEach(state => states.add(state));
+  return Array.from(states);
+}
+
+function stateWithHit(currentState: string, level: number) {
+  const parts = currentState.split('_');
+  if (!parts[level]) {
+    return '';
+  }
+  parts[level] = parts[level].replace('*', '').replace('-', '*-');
+  if (!parts[level].includes('*')) {
+    parts[level] += '*';
+  }
+  return parts.join('_');
 }
 
 function historyYearRows(windowCode: string) {
@@ -915,6 +937,15 @@ function stateSortKey(windowCode: string, state: string) {
 function stateLevelLabel(state: string) {
   const index = state.split('_').findIndex(part => part.includes('*'));
   return index >= 0 ? `LV${index}` : '';
+}
+
+function stateLevelIndex(state: string) {
+  const index = state.split('_').findIndex(part => part.includes('*'));
+  return index >= 0 ? index : 999;
+}
+
+function compareStateLevel(a: { state: string; count: number }, b: { state: string; count: number }) {
+  return stateLevelIndex(a.state) - stateLevelIndex(b.state) || b.count - a.count || a.state.localeCompare(b.state);
 }
 
 function compareHistoryRows(
