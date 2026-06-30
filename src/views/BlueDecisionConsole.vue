@@ -78,10 +78,10 @@
             </div>
             <div v-if="decisionMode === 'MANUAL' && manualDraft" class="source-controls">
               <input type="checkbox" :checked="sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" @change="toggleSource('WINDOW_LEVEL', window.windowCode, level.level, $event)" />
-              <select class="field compact-field" :disabled="!sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" :value="sourceDecision('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'decisionType', $event)">
+              <select class="field compact-field" :value="sourceDecision('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'decisionType', $event)">
                 <option>选择</option><option>观察</option><option>排除</option>
               </select>
-              <input class="field score-field" type="number" step="0.5" :disabled="!sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" :value="sourceScore('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'score', $event)" />
+              <input class="field score-field" type="number" step="0.5" :value="sourceScore('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'score', $event)" />
             </div>
           </div>
         </div>
@@ -294,10 +294,10 @@
         <label v-for="source in fixedSourceOptions" :key="source.key" class="fixed-source-card">
           <span><input type="checkbox" :checked="sourceEnabled(source.type, source.windowCode)" @change="toggleSource(source.type, source.windowCode, null, $event)" /> {{ source.label }}</span>
           <small>{{ source.numbers.join(',') || '无号码' }}</small>
-          <select class="field compact-field" :disabled="!sourceEnabled(source.type, source.windowCode)" :value="sourceDecision(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'decisionType', $event)">
+          <select class="field compact-field" :value="sourceDecision(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'decisionType', $event)">
             <option>选择</option><option>观察</option><option>排除</option>
           </select>
-          <input class="field score-field" type="number" step="0.5" :disabled="!sourceEnabled(source.type, source.windowCode)" :value="sourceScore(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'score', $event)" />
+          <input class="field score-field" type="number" step="0.5" :value="sourceScore(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'score', $event)" />
         </label>
       </div>
 
@@ -471,6 +471,7 @@ const forcedNumbers = ref<string[]>([]);
 const excludedNumbers = ref<string[]>([]);
 const snapshots = ref<BlueDecisionSnapshot[]>([]);
 const selectedSnapshotIds = ref<number[]>([]);
+const pendingSourceDrafts = reactive<Record<string, { decisionType: BlueDecisionScoreSource['decisionType']; score: number }>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const historyMode = reactive<Record<string, 'year' | 'all'>>({});
 const historySortField = reactive<Record<string, HistorySortField>>({});
@@ -678,6 +679,7 @@ async function newManualSample() {
   forcedNumbers.value = [];
   excludedNumbers.value = [];
   selectedBlue.value = [];
+  Object.keys(pendingSourceDrafts).forEach(key => delete pendingSourceDrafts[key]);
   sampleName.value = nextManualSampleName();
   manualDirty.value = false;
   await run(async () => runManualScore());
@@ -701,12 +703,14 @@ function sourceEnabled(type: string, windowCode?: string | null, level?: number 
 }
 
 function sourceDecision(type: string, windowCode?: string | null, level?: number | null) {
-  return findSource(type, windowCode, level)?.decisionType || defaultDecisionType(type);
+  const key = sourceKey(type, windowCode, level);
+  return findSource(type, windowCode, level)?.decisionType || pendingSourceDrafts[key]?.decisionType || defaultDecisionType(type);
 }
 
 function sourceScore(type: string, windowCode?: string | null, level?: number | null) {
+  const key = sourceKey(type, windowCode, level);
   const source = findSource(type, windowCode, level);
-  return source?.score ?? defaultSourceScore(defaultDecisionType(type));
+  return source?.score ?? pendingSourceDrafts[key]?.score ?? defaultSourceScore(defaultDecisionType(type));
 }
 
 async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, event: Event) {
@@ -717,16 +721,26 @@ async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowC
   const checked = (event.target as HTMLInputElement).checked;
   const key = sourceKey(type, windowCode, level);
   const sources = manualDraft.value.sources || [];
-  const decisionType = type === 'WINDOW_LEVEL' ? '观察' : '排除';
+  const source = findSource(type, windowCode, level);
+  if (!checked && source) {
+    pendingSourceDrafts[key] = { decisionType: source.decisionType, score: source.score };
+  }
   manualDraft.value.sources = checked
-    ? [...sources, { sourceType: type, windowCode, level, decisionType, score: defaultSourceScore(decisionType) }]
+    ? [...sources, { sourceType: type, windowCode, level, decisionType: sourceDecision(type, windowCode, level), score: sourceScore(type, windowCode, level) }]
     : sources.filter(source => sourceKey(source.sourceType, source.windowCode, source.level) !== key);
   await run(async () => runManualScore());
 }
 
 async function updateSource(type: BlueDecisionScoreSource['sourceType'], windowCode: string | null, level: number | null, field: 'decisionType' | 'score', event: Event) {
+  const key = sourceKey(type, windowCode, level);
   const source = findSource(type, windowCode, level);
-  if (!source) return;
+  if (!source) {
+    const current = pendingSourceDrafts[key] || { decisionType: defaultDecisionType(type), score: defaultSourceScore(defaultDecisionType(type)) };
+    pendingSourceDrafts[key] = field === 'score'
+      ? { ...current, score: Number((event.target as HTMLInputElement).value || 0) }
+      : { decisionType: (event.target as HTMLSelectElement).value as BlueDecisionScoreSource['decisionType'], score: defaultSourceScore((event.target as HTMLSelectElement).value) };
+    return;
+  }
   if (field === 'score') source.score = Number((event.target as HTMLInputElement).value || 0);
   else {
     source.decisionType = (event.target as HTMLSelectElement).value as BlueDecisionScoreSource['decisionType'];
