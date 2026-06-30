@@ -717,8 +717,9 @@ async function toggleSource(type: BlueDecisionScoreSource['sourceType'], windowC
   const checked = (event.target as HTMLInputElement).checked;
   const key = sourceKey(type, windowCode, level);
   const sources = manualDraft.value.sources || [];
+  const decisionType = type === 'WINDOW_LEVEL' ? '观察' : '排除';
   manualDraft.value.sources = checked
-    ? [...sources, { sourceType: type, windowCode, level, decisionType: '排除', score: defaultSourceScore('排除') }]
+    ? [...sources, { sourceType: type, windowCode, level, decisionType, score: defaultSourceScore(decisionType) }]
     : sources.filter(source => sourceKey(source.sourceType, source.windowCode, source.level) !== key);
   await run(async () => runManualScore());
 }
