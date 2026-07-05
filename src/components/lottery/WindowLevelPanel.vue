@@ -118,12 +118,12 @@
       <!-- 分栏模式：同组多个枚举值均分显示 -->
       <div
         v-if="currentGroup && currentGroup.keys.length > 1"
-        class="flex gap-4"
+        :class="multiWindowGridClass"
       >
         <div
           v-for="key in currentGroup.keys"
           :key="key"
-          class="flex-1 overflow-auto border border-border rounded"
+          :class="multiWindowCardClass"
         >
           <!-- 分栏内窗口期号信息区 -->
           <div class="sticky top-0 bg-bg-card z-10 border-b border-border px-2 py-1 text-xs">
@@ -359,6 +359,16 @@ const activeGroupKey = ref<string>('RED_NUMBER');
 
 const currentGroup = computed(() => {
   return groupedWindowLevels.value.find(g => g.prefix === activeGroupKey.value);
+});
+
+const multiWindowGridClass = computed(() => {
+  return activeGroupKey.value === 'RED_NUMBER'
+    ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4'
+    : 'grid grid-cols-1 md:grid-cols-3 gap-4';
+});
+
+const multiWindowCardClass = computed(() => {
+  return 'min-w-0 overflow-auto border border-border rounded';
 });
 
 const currentKey = computed<WindowLevelEnum>(() => {
