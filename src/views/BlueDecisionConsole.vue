@@ -5,7 +5,13 @@
     <section class="decision-card">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-bold">蓝球窗口决策台</h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold">蓝球窗口决策台</h1>
+            <div class="segmented">
+              <button class="state-tab compact" :class="{ active: targetMode === 'BLUE' }" @click="switchTargetMode('BLUE')">蓝球</button>
+              <button class="state-tab compact" :class="{ active: targetMode === 'TAIL' }" @click="switchTargetMode('TAIL')">蓝尾</button>
+            </div>
+          </div>
           <p class="text-xs text-text-secondary">按蓝10/16/32窗口逐步观察、调权、保存样本并复盘。</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -49,7 +55,7 @@
     </section>
 
     <section v-if="prepare" class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-      <div v-for="window in prepare.windows" :key="window.windowCode" class="decision-card">
+      <div v-for="window in visibleWindows" :key="window.windowCode" class="decision-card">
         <div class="flex items-center justify-between gap-2">
           <h2 class="font-bold">{{ window.windowName }}</h2>
           <span class="text-xs text-text-secondary">状态：{{ window.stateText }}</span>
@@ -59,7 +65,7 @@
             v-for="level in displayLevels(window)"
             :key="level.level"
             class="level-row"
-            :class="{ 'active-source-row': decisionMode === 'MANUAL' && sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level) }"
+            :class="sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level) ? `active-source-row source-${reasonClass(sourceDecision('WINDOW_LEVEL', window.windowCode, level.level))}` : ''"
           >
             <div class="level-title">lv{{ level.level }}</div>
             <div class="flex flex-wrap gap-1">
@@ -78,7 +84,7 @@
             </div>
             <div v-if="decisionMode === 'MANUAL' && manualDraft" class="source-controls">
               <input type="checkbox" :checked="sourceEnabled('WINDOW_LEVEL', window.windowCode, level.level)" @change="toggleSource('WINDOW_LEVEL', window.windowCode, level.level, $event)" />
-              <select class="field compact-field" :value="sourceDecision('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'decisionType', $event)">
+              <select class="field compact-field" :class="`source-text-${reasonClass(sourceDecision('WINDOW_LEVEL', window.windowCode, level.level))}`" :value="sourceDecision('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'decisionType', $event)">
                 <option>选择</option><option>观察</option><option>排除</option>
               </select>
               <input class="field score-field" type="number" step="0.5" :value="sourceScore('WINDOW_LEVEL', window.windowCode, level.level)" @change="updateSource('WINDOW_LEVEL', window.windowCode, level.level, 'score', $event)" />
@@ -101,7 +107,7 @@
               全部
             </button>
             <button
-              v-for="window in prepare.windows"
+              v-for="window in visibleWindows"
               :key="window.windowCode"
               class="state-tab window-history-tab"
               :class="{ active: selectedHistoryWindow === window.windowCode }"
@@ -118,7 +124,7 @@
         </button>
       </div>
       <div v-if="!historyCollapsed && selectedHistoryWindow === 'ALL'" class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-3">
-        <div v-for="window in prepare.windows" :key="window.windowCode" class="history-card">
+        <div v-for="window in visibleWindows" :key="window.windowCode" class="history-card">
           <div class="flex items-center justify-between gap-2">
             <h3 class="font-bold">{{ window.windowName }}</h3>
             <div class="segmented">
@@ -270,7 +276,7 @@
     <section v-if="prepare" class="decision-card">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="font-bold">蓝球评分方案</h2>
+          <h2 class="font-bold">{{ targetMode === 'BLUE' ? '蓝球评分方案' : '蓝尾评分方案' }}</h2>
           <p class="text-xs text-text-secondary">系统默认只读；人工方案从空白分源开始，两套结果互不影响。</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -292,50 +298,19 @@
       </div>
 
       <div v-if="decisionMode === 'MANUAL' && manualDraft" class="mt-3 fixed-source-grid">
-        <label v-for="source in fixedSourceOptions" :key="source.key" class="fixed-source-card">
+        <label v-for="source in fixedSourceOptions" :key="source.key" class="fixed-source-card" :class="sourceEnabled(source.type, source.windowCode) ? `source-${reasonClass(sourceDecision(source.type, source.windowCode))}` : ''">
           <span><input type="checkbox" :checked="sourceEnabled(source.type, source.windowCode)" @change="toggleSource(source.type, source.windowCode, null, $event)" /> {{ source.label }}</span>
           <small>{{ source.numbers.join(',') || '无号码' }}</small>
-          <select class="field compact-field" :value="sourceDecision(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'decisionType', $event)">
+          <select class="field compact-field" :class="`source-text-${reasonClass(sourceDecision(source.type, source.windowCode))}`" :value="sourceDecision(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'decisionType', $event)">
             <option>选择</option><option>观察</option><option>排除</option>
           </select>
           <input class="field score-field" type="number" step="0.5" :value="sourceScore(source.type, source.windowCode)" @change="updateSource(source.type, source.windowCode, null, 'score', $event)" />
         </label>
       </div>
 
-      <div v-if="scoreResult" class="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
-        <div class="table-wrap">
-          <table class="decision-table">
-            <thead>
-              <tr>
-                <th>序号</th>
-                <th>蓝球</th>
-                <th>分</th>
-                <th>等级</th>
-                <th>选择</th>
-                <th>保留</th>
-                <th>排除</th>
-                <th>说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, index) in scoreResult.scores" :key="row.number">
-                <td>{{ index + 1 }}</td>
-                <td class="font-bold">
-                  <span :class="{ 'actual-blue-hit': isActualBlue(row.number) }">{{ row.number }}</span>
-                </td>
-                <td>{{ row.score }}</td>
-                <td>{{ row.grade }}</td>
-                <td><input v-model="selectedBlue" type="checkbox" :disabled="decisionMode === 'SYSTEM'" :value="row.number" /></td>
-                <td><input :checked="forcedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('forced', row.number, $event)" /></td>
-                <td><input :checked="excludedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('excluded', row.number, $event)" /></td>
-                <td class="text-xs text-text-secondary">{{ row.reasons.join('；') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="space-y-3">
-          <div v-if="decisionMode === 'MANUAL' && manualDraft" class="summary-box">
+      <div v-if="scoreResult" class="mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div class="summary-box">
             <div class="summary-label">系统候选</div>
             <div class="summary-value">
               <template v-for="(number, index) in scoreResult.candidateBlue" :key="number">
@@ -354,15 +329,44 @@
               <template v-else>未选择</template>
             </div>
           </div>
-          <div class="summary-box">
-            <div class="summary-label">人工分数微调（可选）</div>
-            <div class="grid grid-cols-4 gap-2">
-              <label v-for="n in allBlueNumbers" :key="n" class="text-xs">
-                {{ n }}
-                <input :value="ballAdjustValue(n)" class="field mt-1 w-full" type="number" step="0.5" @change="updateBallAdjust(n, $event)" />
-              </label>
-            </div>
-          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="decision-table">
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>{{ targetMode === 'BLUE' ? '蓝球' : '蓝尾' }}</th>
+                <th>分</th>
+                <th>等级</th>
+                <th v-if="targetMode === 'BLUE'">选择</th>
+                <th v-if="targetMode === 'BLUE'">保留</th>
+                <th v-if="targetMode === 'BLUE'">排除</th>
+                <th>说明</th>
+                <th v-if="targetMode === 'BLUE' && decisionMode === 'MANUAL'">分数微调</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, index) in displayScores" :key="row.number">
+                <td>{{ index + 1 }}</td>
+                <td class="font-bold">
+                  <span :class="{ 'actual-blue-hit': targetMode === 'BLUE' ? isActualBlue(row.number) : isActualTail(row.number) }">{{ row.number }}</span>
+                </td>
+                <td :class="scoreVisualClass(row)">{{ row.score }}</td>
+                <td :class="scoreVisualClass(row)">{{ row.grade }}</td>
+                <td v-if="targetMode === 'BLUE'"><input v-model="selectedBlue" type="checkbox" :disabled="decisionMode === 'SYSTEM'" :value="row.number" /></td>
+                <td v-if="targetMode === 'BLUE'"><input :checked="forcedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('forced', row.number, $event)" /></td>
+                <td v-if="targetMode === 'BLUE'"><input :checked="excludedNumbers.includes(row.number)" type="checkbox" :disabled="decisionMode === 'SYSTEM'" @change="toggleConstraint('excluded', row.number, $event)" /></td>
+                <td class="reason-cell">
+                  <div v-for="group in groupedReasons(row)" :key="group.type" :class="`reason-${reasonClass(group.type)}`">
+                    {{ group.items.join('；') }}
+                  </div>
+                </td>
+                <td v-if="targetMode === 'BLUE' && decisionMode === 'MANUAL'">
+                  <input :value="ballAdjustValue(row.number)" class="field score-field" type="number" step="0.5" @change="updateBallAdjust(row.number, $event)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -410,7 +414,7 @@
               <td>{{ modeLabel(snapshot.decisionMode) }}</td>
               <td class="font-bold">{{ snapshot.selectedBlue.join(',') }}</td>
               <td class="text-ball-blue">{{ snapshot.candidateBlue.join(',') }}</td>
-              <td>{{ snapshot.actualBlue || '--' }}</td>
+              <td>{{ snapshot.actualBlue ? `${snapshot.actualBlue} / 尾${snapshot.actualTail}` : '--' }}</td>
               <td :class="snapshot.hitResult === 1 ? 'text-green-300' : 'text-text-secondary'">
                 {{ snapshot.hitResult === null ? '--' : snapshot.hitResult === 1 ? '命中' : '未中' }}
               </td>
@@ -459,7 +463,8 @@ import {
   type BlueDecisionMode,
   type BlueDecisionScoreSource,
   type BlueDecisionScore,
-  type BlueDecisionSnapshot
+  type BlueDecisionSnapshot,
+  type BlueBallScore
 } from '@/api/modules/blueDecision';
 
 const lotteryStore = useLotteryStore();
@@ -474,6 +479,7 @@ const scoreResult = ref<BlueDecisionScore | null>(null);
 const systemScore = ref<BlueDecisionScore | null>(null);
 const manualScore = ref<BlueDecisionScore | null>(null);
 const decisionMode = ref<'SYSTEM' | 'MANUAL'>('SYSTEM');
+const targetMode = ref<'BLUE' | 'TAIL'>('BLUE');
 const manualDraft = ref<BlueDecisionManualAdjust | null>(null);
 const manualDirty = ref(false);
 const selectedBlue = ref<string[]>([]);
@@ -496,9 +502,13 @@ type HistorySortField = 'year' | 'state' | 'count' | 'currentYearCount';
 type StateHistorySortField = 'year' | 'count';
 const qiHaoList = ref<string[]>([]);
 const showQiHaoDropdown = ref(false);
-const allBlueNumbers = Array.from({ length: 16 }, (_, index) => String(index + 1).padStart(2, '0'));
-
 const messageClass = computed(() => messageType.value === 'ok' ? 'text-green-300' : 'text-ball-red');
+const visibleWindows = computed(() => (prepare.value?.windows || []).filter(window =>
+  targetMode.value === 'TAIL' ? window.windowCode.startsWith('BLUE_TAIL_') : !window.windowCode.startsWith('BLUE_TAIL_')
+));
+const displayScores = computed(() => targetMode.value === 'TAIL'
+  ? (scoreResult.value?.tailScores || [])
+  : (scoreResult.value?.scores || []));
 const selectedWindowStateRows = computed(() => historyStateRows(selectedHistoryWindow.value));
 const allSnapshotsSelected = computed({
   get: () => snapshots.value.length > 0 && snapshots.value.every(snapshot => selectedSnapshotIds.value.includes(snapshot.id)),
@@ -523,11 +533,13 @@ const fixedSourceOptions = computed<Array<{
   numbers: string[];
 }>>(() => {
   if (!prepare.value) return [];
-  const base: Array<{ key: string; type: BlueDecisionScoreSource['sourceType']; windowCode: string | null; label: string; numbers: string[] }> = [
-    { key: 'PREVIOUS_BLUE', type: 'PREVIOUS_BLUE' as const, windowCode: null, label: '上期蓝球', numbers: prepare.value.fixedSources?.PREVIOUS_BLUE || [] },
-    { key: 'PREVIOUS_NEIGHBOR', type: 'PREVIOUS_NEIGHBOR' as const, windowCode: null, label: '上期邻号', numbers: prepare.value.fixedSources?.PREVIOUS_NEIGHBOR || [] }
-  ];
-  return [...base, ...prepare.value.windows.map(window => ({
+  const base: Array<{ key: string; type: BlueDecisionScoreSource['sourceType']; windowCode: string | null; label: string; numbers: string[] }> = targetMode.value === 'TAIL'
+    ? [{ key: 'PREVIOUS_TAIL', type: 'PREVIOUS_TAIL', windowCode: null, label: '上期蓝尾', numbers: prepare.value.fixedSources?.PREVIOUS_TAIL || [] }]
+    : [
+        { key: 'PREVIOUS_BLUE', type: 'PREVIOUS_BLUE', windowCode: null, label: '上期蓝球', numbers: prepare.value.fixedSources?.PREVIOUS_BLUE || [] },
+        { key: 'PREVIOUS_NEIGHBOR', type: 'PREVIOUS_NEIGHBOR', windowCode: null, label: '上期邻号', numbers: prepare.value.fixedSources?.PREVIOUS_NEIGHBOR || [] }
+      ];
+  return [...base, ...visibleWindows.value.map(window => ({
     key: `WILL_DOWN:${window.windowCode}`,
     type: 'WILL_DOWN' as const,
     windowCode: window.windowCode,
@@ -761,6 +773,11 @@ function sourceDecision(type: string, windowCode?: string | null, level?: number
   return findSource(type, windowCode, level)?.decisionType || pendingSourceDrafts[key]?.decisionType || defaultDecisionType(type);
 }
 
+function switchTargetMode(mode: 'BLUE' | 'TAIL') {
+  targetMode.value = mode;
+  selectedHistoryWindow.value = 'ALL';
+}
+
 function sourceScore(type: string, windowCode?: string | null, level?: number | null) {
   const key = sourceKey(type, windowCode, level);
   const source = findSource(type, windowCode, level);
@@ -833,7 +850,7 @@ async function toggleConstraint(kind: 'forced' | 'excluded', number: string, eve
 }
 
 function activeScore(number: string) {
-  return scoreResult.value?.scores.find(score => score.number === number)?.score || 0;
+  return displayScores.value.find(score => score.number === number)?.score || 0;
 }
 
 function ballAdjustValue(number: string) {
@@ -860,6 +877,40 @@ function isActualBlue(number: string) {
   return showDrawBlue.value && Boolean(prepare.value?.windows.some(window =>
     window.levels.some(level => (level.hitNumbers || []).includes(number))
   ));
+}
+
+function isActualTail(number: string) {
+  return showDrawBlue.value && Boolean(prepare.value?.windows
+    .filter(window => window.windowCode.startsWith('BLUE_TAIL_'))
+    .some(window => window.levels.some(level => (level.hitNumbers || []).includes(number))));
+}
+
+function groupedReasons(row: BlueBallScore) {
+  const order = ['选择', '观察', '排除', '微调'];
+  const details = row.reasonDetails?.length
+    ? row.reasonDetails
+    : (row.reasons || []).map(reason => ({
+        decisionType: reason.includes('【选择】') ? '选择' : reason.includes('【排除】') ? '排除' : '观察',
+        text: reason.replace(/【[^】]+】/g, ''),
+        score: 0
+      }));
+  return order.map(type => ({
+    type,
+    items: details
+      .filter(detail => detail.decisionType === type)
+      .map(detail => `${detail.text} ${signedScore(detail.score)}`)
+  })).filter(group => group.items.length > 0);
+}
+
+function reasonClass(type: string) {
+  return type === '选择' ? 'select' : type === '排除' ? 'exclude' : type === '微调' ? 'adjust' : 'watch';
+}
+
+function scoreVisualClass(row: BlueBallScore) {
+  const types = row.reasonDetails?.map(reason => reason.decisionType) || [];
+  if (types.includes('选择')) return 'score-positive';
+  if (types.includes('观察') || types.includes('微调') && row.score > 0) return 'score-watch';
+  return 'score-negative';
 }
 
 function resetHistoryTabs() {
@@ -1171,6 +1222,44 @@ onMounted(async () => {
   border-radius: 6px;
   background: rgba(255, 71, 87, 0.12);
   padding: 4px;
+}
+
+.source-select {
+  border-color: rgba(245, 196, 76, 0.65);
+  background: rgba(245, 196, 76, 0.12);
+}
+
+.source-watch {
+  border-color: rgba(71, 151, 255, 0.6);
+  background: rgba(71, 151, 255, 0.12);
+}
+
+.source-exclude {
+  border-color: rgba(160, 160, 160, 0.5);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.source-text-select,
+.reason-select,
+.score-positive {
+  color: #f5c44c;
+}
+
+.source-text-watch,
+.reason-watch,
+.reason-adjust,
+.score-watch {
+  color: #7db7ff;
+}
+
+.source-text-exclude,
+.reason-exclude,
+.score-negative {
+  color: #9ca3af;
+}
+
+.reason-cell > div + div {
+  margin-top: 3px;
 }
 
 .source-controls {

@@ -10,7 +10,7 @@ export interface BlueDecisionManualAdjust {
 export type BlueDecisionMode = 'SYSTEM' | 'MANUAL' | 'LEGACY';
 
 export interface BlueDecisionScoreSource {
-  sourceType: 'WINDOW_LEVEL' | 'PREVIOUS_BLUE' | 'PREVIOUS_NEIGHBOR' | 'WILL_DOWN';
+  sourceType: 'WINDOW_LEVEL' | 'PREVIOUS_BLUE' | 'PREVIOUS_NEIGHBOR' | 'PREVIOUS_TAIL' | 'WILL_DOWN';
   windowCode?: string | null;
   level?: number | null;
   decisionType: '选择' | '观察' | '排除';
@@ -51,6 +51,11 @@ export interface BlueBallScore {
   grade: string;
   supportCount: number;
   reasons: string[];
+  reasonDetails?: Array<{
+    decisionType: string;
+    text: string;
+    score: number;
+  }>;
 }
 
 export interface BlueDecisionScore {
@@ -59,6 +64,7 @@ export interface BlueDecisionScore {
   systemWeights: Record<string, number>;
   manualAdjust: BlueDecisionManualAdjust | null;
   scores: BlueBallScore[];
+  tailScores: BlueBallScore[];
   candidateBlue: string[];
 }
 
@@ -70,6 +76,7 @@ export interface BlueDecisionSnapshot {
   selectedBlue: string[];
   candidateBlue: string[];
   actualBlue: string | null;
+  actualTail: string | null;
   hitResult: number | null;
   reviewStatus: string;
   testData: boolean;
