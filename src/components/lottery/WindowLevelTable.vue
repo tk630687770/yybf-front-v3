@@ -1,6 +1,6 @@
 <template>
   <div class="overflow-x-auto">
-    <div class="flex justify-center">
+    <div class="flex justify-start">
       <table class="text-xs border-collapse">
         <thead>
           <tr class="border border-bg-secondary">
