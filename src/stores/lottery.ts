@@ -12,6 +12,11 @@ import { db } from '@/composables/useDatabase';
  * 窗口等级枚举项列表
  */
 export const windowLevelList: WindowLevelEnumItem[] = [
+  { key: 'RED_NUMBER_3', label: '红球3窗口', category: 'RED_NUMBER' },
+  { key: 'RED_NUMBER_4', label: '红球4窗口', category: 'RED_NUMBER' },
+  { key: 'RED_NUMBER_5', label: '红球5窗口', category: 'RED_NUMBER' },
+  { key: 'RED_NUMBER_6', label: '红球6窗口', category: 'RED_NUMBER' },
+  { key: 'RED_NUMBER_8', label: '红球8窗口', category: 'RED_NUMBER' },
   { key: 'RED_NUMBER_10', label: '红球10窗口', category: 'RED_NUMBER' },
   { key: 'RED_NUMBER_20', label: '红球20窗口', category: 'RED_NUMBER' },
   { key: 'RED_NUMBER_33', label: '红球33窗口', category: 'RED_NUMBER' },

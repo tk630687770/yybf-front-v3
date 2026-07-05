@@ -55,6 +55,11 @@ export interface WindowRecord {
  * 用于指定不同粒度的窗口统计
  */
 export const WindowLevelEnum = {
+  RED_NUMBER_3: 'RED_NUMBER_3',
+  RED_NUMBER_4: 'RED_NUMBER_4',
+  RED_NUMBER_5: 'RED_NUMBER_5',
+  RED_NUMBER_6: 'RED_NUMBER_6',
+  RED_NUMBER_8: 'RED_NUMBER_8',
   RED_NUMBER_10: 'RED_NUMBER_10',
   RED_NUMBER_20: 'RED_NUMBER_20',
   RED_NUMBER_33: 'RED_NUMBER_33',
