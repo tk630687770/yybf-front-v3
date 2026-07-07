@@ -36,11 +36,16 @@
             </span>
           </div>
           <div class="source-controls">
-            <input v-model="conditionDraft[key(window.windowCode, level.level)].enabled" type="checkbox" />
-            <select v-model="conditionDraft[key(window.windowCode, level.level)].decisionType" class="mini-field">
-              <option>选择</option><option>观察</option><option>排除</option>
+            <input v-model="conditionDraft[key(window.windowCode, level.level)].enabled" type="checkbox" @change="refreshScoreIfReady" />
+            <select
+              v-model="conditionDraft[key(window.windowCode, level.level)].decisionType"
+              class="mini-field"
+              :class="decisionTextClass(conditionDraft[key(window.windowCode, level.level)].decisionType)"
+              @change="changeDecisionType(window.windowCode, level.level)"
+            >
+              <option class="source-text-select">选择</option><option class="source-text-watch">观察</option><option class="source-text-exclude">排除</option>
             </select>
-            <input v-model.number="conditionDraft[key(window.windowCode, level.level)].score" class="mini-field score" type="number" step="0.5" />
+            <input v-model.number="conditionDraft[key(window.windowCode, level.level)].score" class="mini-field score" type="number" step="0.5" @change="refreshScoreIfReady" />
           </div>
         </div>
       </article>
@@ -55,9 +60,9 @@
         </div>
       </div>
       <div class="candidate-grid">
-        <label v-for="number in allReds" :key="number" class="candidate" :class="{ selected: candidateRed.includes(number) }">
-          <input type="checkbox" :checked="candidateRed.includes(number)" @change="toggleCandidate(number)" />
-          <strong>{{ number }}</strong><small>{{ scoreOf(number) }}</small>
+        <label v-for="row in candidateRows" :key="row.number" class="candidate" :class="{ selected: candidateRed.includes(row.number) }">
+          <input type="checkbox" :checked="candidateRed.includes(row.number)" @change="toggleCandidate(row.number)" />
+          <strong>{{ row.number }}</strong><small>{{ formatScore(row.score) }}</small>
         </label>
       </div>
       <div class="score-table-wrap">
@@ -229,15 +234,33 @@ const activeRedNumbers = computed(() => {
 });
 const currentHistoryYear = computed(() => Number(predictQiHao.value.slice(0, 4)) || new Date().getFullYear());
 const selectedHistoryItems = computed(() => historyItems(selectedHistoryWindow.value));
+const candidateRows = computed(() => {
+  const byNumber = new Map((score.value?.scores || []).map(item => [item.number, item.score]));
+  return allReds.map(number => ({ number, score: byNumber.get(number) }))
+    .sort((left, right) => (right.score ?? -Infinity) - (left.score ?? -Infinity) || Number(left.number) - Number(right.number));
+});
 
 function key(windowCode: string, level: number) { return `${windowCode}:${level}`; }
 function switchTarget(type: RedTargetType) { targetType.value = type; prepare.value = null; score.value = null; clearHistory(); candidateRed.value = []; }
 function formatWindowNumber(number: string) { return targetType.value === 'RED' ? number : `尾${number}`; }
 function decisionClass(windowCode: string, level: number) { const item = conditionDraft[key(windowCode, level)]; return item?.enabled ? `decision-${item.decisionType}` : ''; }
 function isMapped(number: string) { return targetType.value === 'RED' ? activeRedNumbers.value.has(number) : [...activeRedNumbers.value].some(red => Number(red) % 10 === Number(number)); }
-function scoreOf(number: string) { return score.value?.scores.find(item => item.number === number)?.score ?? '-'; }
+function decisionTextClass(type: string) { return type === '选择' ? 'source-text-select' : type === '排除' ? 'source-text-exclude' : 'source-text-watch'; }
+function defaultScore(type: string) { return type === '选择' ? 1 : type === '排除' ? -0.5 : 0.5; }
+function formatScore(value?: number) { return value == null ? '-' : Number(value.toFixed(2)); }
 function levelText(levels: Record<string, number>) { return Object.entries(levels).map(([code, level]) => `${code.replaceAll('_', '')}:lv${level}`).join(' / '); }
 function arrayCount(value: unknown) { return Array.isArray(value) ? value.length : 0; }
+
+async function changeDecisionType(windowCode: string, level: number) {
+  const item = conditionDraft[key(windowCode, level)];
+  item.score = defaultScore(item.decisionType);
+  await refreshScoreIfReady();
+}
+
+async function refreshScoreIfReady() {
+  if (!prepare.value || loading.value) return;
+  await runScore();
+}
 
 async function loadPrepare() {
   await run(async () => {
@@ -364,5 +387,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.card{border:1px solid rgba(234,234,234,.11);border-radius:8px;background:var(--color-bg-card);padding:14px}.toolbar,.section-head,.window-head,.source-head,.actions,.title-row,.history-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}h1{font-size:18px;font-weight:700}h2{font-weight:700}p,small{color:var(--color-text-secondary);font-size:12px}.segmented{display:inline-flex;overflow:hidden;border:1px solid rgba(234,234,234,.15);border-radius:6px}.segmented button{padding:5px 9px;color:var(--color-text-secondary)}.segmented button.active{background:var(--color-accent);color:#fff}.btn{border-radius:5px;background:rgba(15,27,56,.85);padding:7px 10px;font-size:12px}.btn.primary{background:var(--color-accent);color:#fff}.btn:disabled{opacity:.45}.field,.mini-field{border:1px solid rgba(234,234,234,.15);border-radius:5px;background:rgba(15,27,56,.75);padding:6px 8px;color:var(--color-text-primary);font-size:12px}.period{width:110px}.mini-field{padding:3px 4px}.mini-field.score{width:52px}.message{margin-top:8px;font-size:12px}.message.ok{color:#34d399}.message.error{color:#fb7185}.window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.window-card{min-width:0}.level-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:start;gap:8px;margin-top:8px;border-left:3px solid transparent;padding:6px 0 6px 7px}.level-title{padding-top:4px;color:var(--color-text-secondary);font-size:12px}.source-controls{display:flex;align-items:center;gap:5px}.decision-选择{border-color:#f5c451}.decision-观察{border-color:#4f8cff}.decision-排除{border-color:#8992a3}.balls{display:flex;flex-wrap:wrap;gap:4px}.ball{border-radius:999px;background:rgba(55,66,250,.28);padding:3px 7px;font-size:11px}.ball.mapped{outline:1px solid #f5c451;color:#fff}.ball.down{border:1px solid #8992a3}.candidate-grid{display:grid;grid-template-columns:repeat(11,minmax(44px,1fr));gap:5px;margin-top:10px}.candidate{display:flex;align-items:center;justify-content:center;gap:4px;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;font-size:12px}.candidate.selected{border-color:var(--color-accent);background:rgba(233,69,96,.15)}.candidate small{font-size:9px}.score-table-wrap{overflow-x:auto;margin-top:12px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:rgba(15,27,56,.88);padding:7px;text-align:left;white-space:nowrap}td{border-bottom:1px solid rgba(234,234,234,.08);padding:7px;vertical-align:top}.red-text{color:#ff6b7d;font-weight:700}.history-head{align-items:flex-start}.history-tab{border-radius:999px;background:rgba(55,66,250,.22);padding:5px 9px;color:var(--color-text-secondary);font-size:12px}.history-tab.active{background:var(--color-accent);color:#fff}.window-history-tab{display:inline-flex;min-width:80px;flex-direction:column;align-items:center;gap:1px}.window-history-tab small{font-size:10px}.history-window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.history-state-grid,.source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px}.history-card,.source-card{min-width:0;border:1px solid rgba(234,234,234,.1);border-radius:6px;background:rgba(15,27,56,.45);padding:10px}.state-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.state-tabs small{margin-left:4px}.history-summary{margin:8px 0;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;color:var(--color-text-secondary);font-size:11px}.history-meta{border-radius:999px;background:rgba(255,255,255,.08);padding:2px 7px;font-size:11px}.current{background:rgba(233,69,96,.2);color:#fff;font-weight:700}.source-card label{display:grid;gap:4px;margin-top:7px;color:var(--color-text-secondary);font-size:11px}.plain{margin-left:8px;color:#8fb2ff;font-size:12px}.filters{margin-top:12px}.filters summary{cursor:pointer;font-weight:700}.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px}.filter-grid label{display:flex;align-items:center;gap:5px;color:var(--color-text-secondary);font-size:11px}.filter-grid .field{min-width:0;flex:1}.field.small{width:55px}.mt{margin-top:12px}.pager{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px}.empty{text-align:center;color:var(--color-text-secondary);padding:15px}@media(max-width:900px){.window-grid,.history-window-grid{grid-template-columns:1fr}.candidate-grid{grid-template-columns:repeat(7,1fr)}}@media(max-width:640px){.level-row{grid-template-columns:32px 1fr}.source-controls{grid-column:2}.candidate-grid{grid-template-columns:repeat(4,1fr)}}
+.card{border:1px solid rgba(234,234,234,.11);border-radius:8px;background:var(--color-bg-card);padding:14px}.toolbar,.section-head,.window-head,.source-head,.actions,.title-row,.history-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}h1{font-size:18px;font-weight:700}h2{font-weight:700}p,small{color:var(--color-text-secondary);font-size:12px}.segmented{display:inline-flex;overflow:hidden;border:1px solid rgba(234,234,234,.15);border-radius:6px}.segmented button{padding:5px 9px;color:var(--color-text-secondary)}.segmented button.active{background:var(--color-accent);color:#fff}.btn{border-radius:5px;background:rgba(15,27,56,.85);padding:7px 10px;font-size:12px}.btn.primary{background:var(--color-accent);color:#fff}.btn:disabled{opacity:.45}.field,.mini-field{border:1px solid rgba(234,234,234,.15);border-radius:5px;background:rgba(15,27,56,.75);padding:6px 8px;color:var(--color-text-primary);font-size:12px}.period{width:110px}.mini-field{padding:3px 4px}.mini-field.score{width:52px}.source-text-select{border-color:rgba(245,196,76,.65);color:#f5c451}.source-text-watch{border-color:rgba(71,151,255,.6);color:#7db7ff}.source-text-exclude{border-color:rgba(160,160,160,.5);color:#9ca3af}.message{margin-top:8px;font-size:12px}.message.ok{color:#34d399}.message.error{color:#fb7185}.window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.window-card{min-width:0}.level-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:start;gap:8px;margin-top:8px;border-left:3px solid transparent;padding:6px 0 6px 7px}.level-title{padding-top:4px;color:var(--color-text-secondary);font-size:12px}.source-controls{display:flex;align-items:center;gap:5px}.decision-选择{border-color:#f5c451}.decision-观察{border-color:#4f8cff}.decision-排除{border-color:#8992a3}.balls{display:flex;flex-wrap:wrap;gap:4px}.ball{border-radius:999px;background:rgba(55,66,250,.28);padding:3px 7px;font-size:11px}.ball.mapped{outline:1px solid #f5c451;color:#fff}.ball.down{border:1px solid #8992a3}.candidate-grid{display:grid;grid-template-columns:repeat(11,minmax(44px,1fr));gap:5px;margin-top:10px}.candidate{display:flex;align-items:center;justify-content:center;gap:4px;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;font-size:12px}.candidate.selected{border-color:var(--color-accent);background:rgba(233,69,96,.15)}.candidate small{font-size:9px}.score-table-wrap{overflow-x:auto;margin-top:12px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:rgba(15,27,56,.88);padding:7px;text-align:left;white-space:nowrap}td{border-bottom:1px solid rgba(234,234,234,.08);padding:7px;vertical-align:top}.red-text{color:#ff6b7d;font-weight:700}.history-head{align-items:flex-start}.history-tab{border-radius:999px;background:rgba(55,66,250,.22);padding:5px 9px;color:var(--color-text-secondary);font-size:12px}.history-tab.active{background:var(--color-accent);color:#fff}.window-history-tab{display:inline-flex;min-width:80px;flex-direction:column;align-items:center;gap:1px}.window-history-tab small{font-size:10px}.history-window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.history-state-grid,.source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px}.history-card,.source-card{min-width:0;border:1px solid rgba(234,234,234,.1);border-radius:6px;background:rgba(15,27,56,.45);padding:10px}.state-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.state-tabs small{margin-left:4px}.history-summary{margin:8px 0;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;color:var(--color-text-secondary);font-size:11px}.history-meta{border-radius:999px;background:rgba(255,255,255,.08);padding:2px 7px;font-size:11px}.current{background:rgba(233,69,96,.2);color:#fff;font-weight:700}.source-card label{display:grid;gap:4px;margin-top:7px;color:var(--color-text-secondary);font-size:11px}.plain{margin-left:8px;color:#8fb2ff;font-size:12px}.filters{margin-top:12px}.filters summary{cursor:pointer;font-weight:700}.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px}.filter-grid label{display:flex;align-items:center;gap:5px;color:var(--color-text-secondary);font-size:11px}.filter-grid .field{min-width:0;flex:1}.field.small{width:55px}.mt{margin-top:12px}.pager{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px}.empty{text-align:center;color:var(--color-text-secondary);padding:15px}@media(max-width:900px){.window-grid,.history-window-grid{grid-template-columns:1fr}.candidate-grid{grid-template-columns:repeat(7,1fr)}}@media(max-width:640px){.level-row{grid-template-columns:32px 1fr}.source-controls{grid-column:2}.candidate-grid{grid-template-columns:repeat(4,1fr)}}
 </style>
