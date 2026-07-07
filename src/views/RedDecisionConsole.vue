@@ -55,7 +55,7 @@
       <div class="section-head">
         <div><h2>候选池与跨窗口落点</h2><p>交集要求号码同时满足全部已勾选等级；并集保留任一等级命中。</p></div>
         <div class="actions">
-          <div class="segmented"><button :class="{ active: mergeMode === 'UNION' }" @click="mergeMode = 'UNION'">并集</button><button :class="{ active: mergeMode === 'INTERSECTION' }" @click="mergeMode = 'INTERSECTION'">交集</button></div>
+          <div class="segmented"><button :class="{ active: mergeMode === 'UNION' }" @click="changeMergeMode('UNION')">并集</button><button :class="{ active: mergeMode === 'INTERSECTION' }" @click="changeMergeMode('INTERSECTION')">交集</button></div>
           <button class="btn" @click="selectAllCandidates">候选池作为来源</button>
         </div>
       </div>
@@ -260,6 +260,11 @@ async function changeDecisionType(windowCode: string, level: number) {
 async function refreshScoreIfReady() {
   if (!prepare.value || loading.value) return;
   await runScore();
+}
+
+async function changeMergeMode(mode: MergeMode) {
+  mergeMode.value = mode;
+  await refreshScoreIfReady();
 }
 
 async function loadPrepare() {
