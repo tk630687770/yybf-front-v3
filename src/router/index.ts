@@ -9,6 +9,7 @@ import ModelDashboard from '../views/ModelDashboard.vue';
 import HistoricalReplayLab from '../views/HistoricalReplayLab.vue';
 import EntryRecallLab from '../views/EntryRecallLab.vue';
 import BlueDecisionConsole from '../views/BlueDecisionConsole.vue';
+import RedDecisionConsole from '../views/RedDecisionConsole.vue';
 
 /**
  * 路由配置数组
@@ -60,6 +61,12 @@ const routes: RouteRecordRaw[] = [
     name: 'BlueDecisionConsole',             // 蓝球决策台路由名称
     component: BlueDecisionConsole,          // 蓝球窗口人工决策组件
     meta: { title: '蓝球决策台' }            // 页面标题
+  },
+  {
+    path: '/red-decision-console',           // 红球决策台路径
+    name: 'RedDecisionConsole',              // 红球决策台路由名称
+    component: RedDecisionConsole,           // 红球窗口人工决策组件
+    meta: { title: '红球决策台' }             // 页面标题
   },
   {
     path: '/model-dashboard',          // 旧模型结果台路径

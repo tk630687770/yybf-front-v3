@@ -63,6 +63,13 @@
           >
             蓝球决策台
           </RouterLink>
+          <RouterLink
+            to="/red-decision-console"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            红球决策台
+          </RouterLink>
         </nav>
       </div>
     </header>
