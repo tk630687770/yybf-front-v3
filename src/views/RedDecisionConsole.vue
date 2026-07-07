@@ -52,30 +52,6 @@
     </section>
 
     <section v-if="prepare" class="card">
-      <div class="section-head">
-        <div><h2>候选池与跨窗口落点</h2><p>交集要求号码同时满足全部已勾选等级；并集保留任一等级命中。</p></div>
-        <div class="actions">
-          <div class="segmented"><button :class="{ active: mergeMode === 'UNION' }" @click="changeMergeMode('UNION')">并集</button><button :class="{ active: mergeMode === 'INTERSECTION' }" @click="changeMergeMode('INTERSECTION')">交集</button></div>
-          <button class="btn" @click="selectAllCandidates">候选池作为来源</button>
-        </div>
-      </div>
-      <div class="candidate-grid">
-        <label v-for="row in candidateRows" :key="row.number" class="candidate" :class="{ selected: candidateRed.includes(row.number) }">
-          <input type="checkbox" :checked="candidateRed.includes(row.number)" @change="toggleCandidate(row.number)" />
-          <strong>{{ row.number }}</strong><small>{{ formatScore(row.score) }}</small>
-        </label>
-      </div>
-      <div class="score-table-wrap">
-        <table><thead><tr><th>排名</th><th>红球</th><th>分</th><th>窗口等级</th><th>依据</th></tr></thead>
-          <tbody><tr v-for="(item, index) in score?.scores || []" :key="item.number">
-            <td>{{ index + 1 }}</td><td class="red-text">{{ item.number }}</td><td>{{ item.score }}</td>
-            <td>{{ levelText(item.windowLevels) }}</td><td>{{ item.reasons.join('；') }}</td>
-          </tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section v-if="prepare" class="card">
       <div class="section-head history-head">
         <div>
           <div class="title-row">
@@ -113,6 +89,30 @@
           <table><thead><tr><th>年份({{ yearRows(selectedHistoryWindow, item.state).length }}年)</th><th>次数</th></tr></thead><tbody><tr v-for="row in yearRows(selectedHistoryWindow, item.state)" :key="row.year" :class="{ current: row.year === currentHistoryYear }"><td>{{ row.year }}</td><td>{{ row.count }}</td></tr></tbody></table>
         </article>
         <div v-if="selectedHistoryItems.length === 0" class="empty">暂无相同状态记录</div>
+      </div>
+    </section>
+
+    <section v-if="prepare" class="card">
+      <div class="section-head">
+        <div><h2>候选池与跨窗口落点</h2><p>交集要求号码同时满足全部已勾选等级；并集保留任一等级命中。</p></div>
+        <div class="actions">
+          <div class="segmented"><button :class="{ active: mergeMode === 'UNION' }" @click="changeMergeMode('UNION')">并集</button><button :class="{ active: mergeMode === 'INTERSECTION' }" @click="changeMergeMode('INTERSECTION')">交集</button></div>
+          <button class="btn" @click="selectAllCandidates">候选池作为来源</button>
+        </div>
+      </div>
+      <div class="candidate-grid">
+        <label v-for="row in candidateRows" :key="row.number" class="candidate" :class="{ selected: candidateRed.includes(row.number) }">
+          <input type="checkbox" :checked="candidateRed.includes(row.number)" @change="toggleCandidate(row.number)" />
+          <strong>{{ row.number }}</strong><small>{{ formatScore(row.score) }}</small>
+        </label>
+      </div>
+      <div class="score-table-wrap">
+        <table><thead><tr><th>排名</th><th>红球</th><th>分</th><th>窗口等级</th><th>依据</th></tr></thead>
+          <tbody><tr v-for="(item, index) in score?.scores || []" :key="item.number">
+            <td>{{ index + 1 }}</td><td class="red-text">{{ item.number }}</td><td>{{ item.score }}</td>
+            <td>{{ levelText(item.windowLevels) }}</td><td>{{ item.reasons.join('；') }}</td>
+          </tr></tbody>
+        </table>
       </div>
     </section>
 
@@ -168,7 +168,7 @@
 
     <section class="card">
       <div class="section-head"><div><h2>决策快照</h2><p>保存完整条件、来源、筛选器和人工保留单式；复盘只读取开奖前快照。</p></div>
-        <div class="actions"><input v-model="sampleName" class="field" placeholder="样本名称" /><label><input v-model="testData" type="checkbox" /> 测试数据</label><button class="btn primary" @click="saveSnapshot(false)">新增样本</button><button class="btn" :disabled="!editingSnapshotId" @click="saveSnapshot(true)">修改样本</button><button class="btn" @click="loadSnapshots">读取样本</button></div>
+        <div class="actions"><input v-model="sampleName" class="field" placeholder="样本名称" /><button class="btn primary" @click="saveSnapshot(false)">新增样本</button><button class="btn" :disabled="!editingSnapshotId" @click="saveSnapshot(true)">修改样本</button><button class="btn" @click="loadSnapshots">读取样本</button></div>
       </div>
       <div class="score-table-wrap"><table><thead><tr><th>ID</th><th>期号</th><th>名称</th><th>候选池</th><th>保留单式</th><th>状态</th><th>操作</th></tr></thead>
         <tbody><tr v-for="item in snapshots" :key="item.id"><td>{{ item.id }}</td><td>{{ item.predictQiHao }}</td><td>{{ item.sampleName }}</td><td>{{ arrayCount(item.decisionData.candidateRed) }}</td><td>{{ arrayCount(item.decisionData.singleTickets) }}</td><td>{{ item.reviewStatus }}</td><td><button class="plain" @click="restoreSnapshot(item)">回显</button><button class="plain" @click="reviewSnapshot(item.id)">复盘</button></td></tr></tbody>
@@ -217,7 +217,6 @@ const selectedCombinationIds = ref<number[]>([]);
 const snapshots = ref<RedSnapshot[]>([]);
 const editingSnapshotId = ref<number | null>(null);
 const sampleName = ref('');
-const testData = ref(false);
 const filter = reactive<FilterDraft>({ minSum: null, maxSum: null, minSpan: null, maxSpan: null, minAc: null, maxAc: null, oddCounts: '', primeCounts: '', bigCounts: '', distinctTailCounts: '', twoRunCount: null, threeRunCount: null, maxRunLength: null, requiredNumbers: '', excludedNumbers: '', minSourceSupport: 1 });
 
 const activeRedNumbers = computed(() => {
@@ -365,7 +364,7 @@ function decisionData() {
 
 async function saveSnapshot(update: boolean) {
   await run(async () => {
-    const payload = { predictQiHao: predictQiHao.value, sampleName: sampleName.value, decisionData: decisionData(), testData: testData.value };
+    const payload = { predictQiHao: predictQiHao.value, sampleName: sampleName.value, decisionData: decisionData(), testData: false };
     const saved = update && editingSnapshotId.value ? await updateRedSnapshot(editingSnapshotId.value, payload) : await saveRedSnapshot(payload);
     editingSnapshotId.value = saved.id;
     await loadSnapshots();
@@ -373,7 +372,7 @@ async function saveSnapshot(update: boolean) {
 }
 async function loadSnapshots() { snapshots.value = await listRedSnapshots(predictQiHao.value); }
 async function restoreSnapshot(item: RedSnapshot) {
-  const detail = await getRedSnapshot(item.id); editingSnapshotId.value = detail.id; sampleName.value = detail.sampleName; testData.value = detail.testData;
+  const detail = await getRedSnapshot(item.id); editingSnapshotId.value = detail.id; sampleName.value = detail.sampleName;
   const data = detail.decisionData as Record<string, unknown>;
   candidateRed.value = Array.isArray(data.candidateRed) ? data.candidateRed.map(String) : [];
   selectedCombinationIds.value = Array.isArray(data.selectedCombinationIds) ? data.selectedCombinationIds.map(Number) : [];
