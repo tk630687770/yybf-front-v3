@@ -75,9 +75,9 @@
           <template v-if="historyViewMode[window.windowCode] === 'year'">
             <div class="state-tabs"><button v-for="item in historyItems(window.windowCode)" :key="item.state" class="history-tab" :class="{ active: activeHistoryState[window.windowCode] === item.state }" @click="activeHistoryState[window.windowCode] = item.state">{{ item.state }}：{{ item.count }}<small>今{{ item.currentYearCount }}</small></button></div>
             <div class="history-summary">{{ distributionText(window.windowCode, activeHistoryState[window.windowCode]) }}</div>
-            <table><thead><tr><th>年份({{ yearRows(window.windowCode, activeHistoryState[window.windowCode]).length }}年)</th><th>次数</th></tr></thead><tbody><tr v-for="row in yearRows(window.windowCode, activeHistoryState[window.windowCode])" :key="row.year" :class="{ current: row.year === currentHistoryYear }"><td>{{ row.year }}</td><td>{{ row.count }}</td></tr></tbody></table>
+            <table><thead><tr><th class="sortable" @click="sortHistory(window.windowCode, 'year')">年份({{ yearRows(window.windowCode, activeHistoryState[window.windowCode]).length }}年)<span class="sort-mark">{{ sortMark(window.windowCode, 'year') }}</span></th><th class="sortable" @click="sortHistory(window.windowCode, 'count')">次数<span class="sort-mark">{{ sortMark(window.windowCode, 'count') }}</span></th></tr></thead><tbody><tr v-for="row in yearRows(window.windowCode, activeHistoryState[window.windowCode])" :key="row.year" :class="{ current: row.year === currentHistoryYear }"><td>{{ row.year }}</td><td>{{ row.count }}</td></tr></tbody></table>
           </template>
-          <table v-else><thead><tr><th>状态</th><th>次数</th><th>今年</th></tr></thead><tbody><tr v-for="item in historyItems(window.windowCode)" :key="item.state"><td>{{ item.state }}</td><td>{{ item.count }}</td><td :class="{ current: item.currentYearCount > 0 }">{{ item.currentYearCount }}</td></tr></tbody></table>
+          <table v-else><thead><tr><th class="sortable" @click="sortHistory(window.windowCode, 'state')">状态<span class="sort-mark">{{ sortMark(window.windowCode, 'state') }}</span></th><th class="sortable" @click="sortHistory(window.windowCode, 'count')">次数<span class="sort-mark">{{ sortMark(window.windowCode, 'count') }}</span></th><th class="sortable" @click="sortHistory(window.windowCode, 'currentYearCount')">今年<span class="sort-mark">{{ sortMark(window.windowCode, 'currentYearCount') }}</span></th></tr></thead><tbody><tr v-for="item in historyItems(window.windowCode)" :key="item.state"><td>{{ item.state }}</td><td>{{ item.count }}</td><td :class="{ current: item.currentYearCount > 0 }">{{ item.currentYearCount }}</td></tr></tbody></table>
           <div v-if="historyItems(window.windowCode).length === 0" class="empty">暂无相同状态记录</div>
         </article>
       </div>
@@ -86,7 +86,7 @@
         <article v-for="item in selectedHistoryItems" :key="item.state" class="history-card">
           <div class="history-card-head"><strong>{{ item.state }}</strong><span class="history-meta">全{{ item.count }}/今{{ item.currentYearCount }}</span></div>
           <div class="history-summary">{{ distributionText(selectedHistoryWindow, item.state) }}</div>
-          <table><thead><tr><th>年份({{ yearRows(selectedHistoryWindow, item.state).length }}年)</th><th>次数</th></tr></thead><tbody><tr v-for="row in yearRows(selectedHistoryWindow, item.state)" :key="row.year" :class="{ current: row.year === currentHistoryYear }"><td>{{ row.year }}</td><td>{{ row.count }}</td></tr></tbody></table>
+          <table><thead><tr><th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'year')">年份({{ yearRows(selectedHistoryWindow, item.state, stateSortKey(selectedHistoryWindow, item.state)).length }}年)<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'year') }}</span></th><th class="sortable" @click="sortStateHistory(selectedHistoryWindow, item.state, 'count')">次数<span class="sort-mark">{{ stateSortMark(selectedHistoryWindow, item.state, 'count') }}</span></th></tr></thead><tbody><tr v-for="row in yearRows(selectedHistoryWindow, item.state, stateSortKey(selectedHistoryWindow, item.state))" :key="row.year" :class="{ current: row.year === currentHistoryYear }"><td>{{ row.year }}</td><td>{{ row.count }}</td></tr></tbody></table>
         </article>
         <div v-if="selectedHistoryItems.length === 0" class="empty">暂无相同状态记录</div>
       </div>
@@ -184,13 +184,16 @@ import { useLotteryStore } from '@/stores/lottery';
 import {
   filterRedCombinations, getRedSnapshot, historyRedDecision, listRedSnapshots, prepareRedDecision,
   reviewRedSnapshot, saveRedSnapshot, scoreRedDecision, updateRedSnapshot,
-  type CombinationResult, type HistoryResult, type MergeMode,
+  type CombinationResult, type HistoryItem, type HistoryResult, type MergeMode,
   type RedPrepare, type RedScore, type RedSnapshot, type RedTargetType, type SchemeSource
 } from '@/api/modules/redDecision';
 
 interface ConditionDraft { enabled: boolean; decisionType: string; score: number }
 interface SourceDraft extends SchemeSource { redPoolText: string; bankersText: string; dragsText: string }
 interface FilterDraft { [key: string]: string | number | null }
+type HistorySortField = 'year' | 'state' | 'count' | 'currentYearCount';
+type StateHistorySortField = 'year' | 'count';
+interface YearCountRow { year: number; count: number }
 
 const lotteryStore = useLotteryStore();
 const allReds = Array.from({ length: 33 }, (_, index) => String(index + 1).padStart(2, '0'));
@@ -211,6 +214,10 @@ const historyViewMode = reactive<Record<string, 'year' | 'all'>>({});
 const activeHistoryState = reactive<Record<string, string>>({});
 const selectedHistoryWindow = ref('ALL');
 const historyCollapsed = ref(false);
+const historySortField = reactive<Record<string, HistorySortField>>({});
+const historySortAsc = reactive<Record<string, boolean>>({});
+const stateHistorySortField = reactive<Record<string, StateHistorySortField>>({});
+const stateHistorySortAsc = reactive<Record<string, boolean>>({});
 const sources = reactive<SourceDraft[]>([]);
 const combinations = ref<CombinationResult | null>(null);
 const selectedCombinationIds = ref<number[]>([]);
@@ -324,12 +331,14 @@ function clearHistory() {
 }
 
 function historyItems(windowCode: string) {
-  return historyByWindow[windowCode]?.items || [];
+  return [...(historyByWindow[windowCode]?.items || [])].sort((a, b) => compareHistoryItems(windowCode, a, b));
 }
 
-function yearRows(windowCode: string, state: string) {
-  const item = historyItems(windowCode).find(row => row.state === state);
-  return Object.entries(item?.yearlyCounts || {}).map(([year, count]) => ({ year: Number(year), count })).sort((a, b) => a.year - b.year);
+function yearRows(windowCode: string, state: string, sortKey = windowCode) {
+  const item = historyByWindow[windowCode]?.items.find(row => row.state === state);
+  return Object.entries(item?.yearlyCounts || {})
+    .map(([year, count]) => ({ year: Number(year), count }))
+    .sort((a, b) => compareYearRows(sortKey, a, b));
 }
 
 function distributionText(windowCode: string, state: string) {
@@ -338,6 +347,66 @@ function distributionText(windowCode: string, state: string) {
   const distinct = [...new Set(counts)].sort((a, b) => a - b);
   const average = counts.reduce((sum, value) => sum + value, 0) / counts.length;
   return `${distinct.join(' · ')}　均值 ${average.toFixed(2)}`;
+}
+
+function sortHistory(windowCode: string, field: HistorySortField) {
+  if (historySortField[windowCode] === field) {
+    historySortAsc[windowCode] = !historySortAsc[windowCode];
+    return;
+  }
+  historySortField[windowCode] = field;
+  historySortAsc[windowCode] = field === 'year' || field === 'state';
+}
+
+function sortStateHistory(windowCode: string, state: string, field: StateHistorySortField) {
+  const key = stateSortKey(windowCode, state);
+  if (stateHistorySortField[key] === field) {
+    stateHistorySortAsc[key] = !stateHistorySortAsc[key];
+    return;
+  }
+  stateHistorySortField[key] = field;
+  stateHistorySortAsc[key] = true;
+}
+
+function sortMark(windowCode: string, field: HistorySortField) {
+  if (historySortField[windowCode] !== field) return '';
+  return historySortAsc[windowCode] ? '▲' : '▼';
+}
+
+function stateSortMark(windowCode: string, state: string, field: StateHistorySortField) {
+  const key = stateSortKey(windowCode, state);
+  if (stateHistorySortField[key] !== field) return '';
+  return stateHistorySortAsc[key] ? '▲' : '▼';
+}
+
+function stateSortKey(windowCode: string, state: string) {
+  return `${windowCode}:${state}`;
+}
+
+function compareHistoryItems(windowCode: string, a: HistoryItem, b: HistoryItem) {
+  const field = historySortField[windowCode] || 'count';
+  const asc = historySortAsc[windowCode] ?? false;
+  const direction = asc ? 1 : -1;
+  if (field === 'state') return compareText(a.state, b.state) * direction;
+  if (field === 'currentYearCount') return compareNumberThenState(a.currentYearCount, b.currentYearCount, a.state, b.state) * direction;
+  return compareNumberThenState(a.count, b.count, a.state, b.state) * direction;
+}
+
+function compareYearRows(sortKey: string, a: YearCountRow, b: YearCountRow) {
+  const isStateSort = sortKey.includes(':');
+  const field = isStateSort ? stateHistorySortField[sortKey] || 'year' : historySortField[sortKey] || 'year';
+  const asc = isStateSort ? stateHistorySortAsc[sortKey] ?? true : historySortAsc[sortKey] ?? true;
+  const direction = asc ? 1 : -1;
+  if (field === 'count') return ((a.count - b.count) || (a.year - b.year)) * direction;
+  return (a.year - b.year) * direction;
+}
+
+function compareNumberThenState(left: number, right: number, leftState: string, rightState: string) {
+  return (left - right) || compareText(leftState, rightState);
+}
+
+function compareText(left: string, right: string) {
+  return left.localeCompare(right, 'zh-Hans-CN');
 }
 
 async function runFilter(page: number) {
@@ -392,4 +461,5 @@ onMounted(async () => {
 
 <style scoped>
 .card{border:1px solid rgba(234,234,234,.11);border-radius:8px;background:var(--color-bg-card);padding:14px}.toolbar,.section-head,.window-head,.source-head,.actions,.title-row,.history-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}h1{font-size:18px;font-weight:700}h2{font-weight:700}p,small{color:var(--color-text-secondary);font-size:12px}.segmented{display:inline-flex;overflow:hidden;border:1px solid rgba(234,234,234,.15);border-radius:6px}.segmented button{padding:5px 9px;color:var(--color-text-secondary)}.segmented button.active{background:var(--color-accent);color:#fff}.btn{border-radius:5px;background:rgba(15,27,56,.85);padding:7px 10px;font-size:12px}.btn.primary{background:var(--color-accent);color:#fff}.btn:disabled{opacity:.45}.field,.mini-field{border:1px solid rgba(234,234,234,.15);border-radius:5px;background:rgba(15,27,56,.75);padding:6px 8px;color:var(--color-text-primary);font-size:12px}.period{width:110px}.mini-field{padding:3px 4px}.mini-field.score{width:52px}.source-text-select{border-color:rgba(245,196,76,.65);color:#f5c451}.source-text-watch{border-color:rgba(71,151,255,.6);color:#7db7ff}.source-text-exclude{border-color:rgba(160,160,160,.5);color:#9ca3af}.message{margin-top:8px;font-size:12px}.message.ok{color:#34d399}.message.error{color:#fb7185}.window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.window-card{min-width:0}.level-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:start;gap:8px;margin-top:8px;border-left:3px solid transparent;padding:6px 0 6px 7px}.level-title{padding-top:4px;color:var(--color-text-secondary);font-size:12px}.source-controls{display:flex;align-items:center;gap:5px}.decision-选择{border-color:#f5c451}.decision-观察{border-color:#4f8cff}.decision-排除{border-color:#8992a3}.balls{display:flex;flex-wrap:wrap;gap:4px}.ball{border-radius:999px;background:rgba(55,66,250,.28);padding:3px 7px;font-size:11px}.ball.mapped{outline:1px solid #f5c451;color:#fff}.ball.down{border:1px solid #8992a3}.candidate-grid{display:grid;grid-template-columns:repeat(11,minmax(44px,1fr));gap:5px;margin-top:10px}.candidate{display:flex;align-items:center;justify-content:center;gap:4px;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;font-size:12px}.candidate.selected{border-color:var(--color-accent);background:rgba(233,69,96,.15)}.candidate small{font-size:9px}.score-table-wrap{overflow-x:auto;margin-top:12px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:rgba(15,27,56,.88);padding:7px;text-align:left;white-space:nowrap}td{border-bottom:1px solid rgba(234,234,234,.08);padding:7px;vertical-align:top}.red-text{color:#ff6b7d;font-weight:700}.history-head{align-items:flex-start}.history-tab{border-radius:999px;background:rgba(55,66,250,.22);padding:5px 9px;color:var(--color-text-secondary);font-size:12px}.history-tab.active{background:var(--color-accent);color:#fff}.window-history-tab{display:inline-flex;min-width:80px;flex-direction:column;align-items:center;gap:1px}.window-history-tab small{font-size:10px}.history-window-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.history-state-grid,.source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px}.history-card,.source-card{min-width:0;border:1px solid rgba(234,234,234,.1);border-radius:6px;background:rgba(15,27,56,.45);padding:10px}.state-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.state-tabs small{margin-left:4px}.history-summary{margin:8px 0;border:1px solid rgba(234,234,234,.1);border-radius:5px;padding:6px;color:var(--color-text-secondary);font-size:11px}.history-meta{border-radius:999px;background:rgba(255,255,255,.08);padding:2px 7px;font-size:11px}.current{background:rgba(233,69,96,.2);color:#fff;font-weight:700}.source-card label{display:grid;gap:4px;margin-top:7px;color:var(--color-text-secondary);font-size:11px}.plain{margin-left:8px;color:#8fb2ff;font-size:12px}.filters{margin-top:12px}.filters summary{cursor:pointer;font-weight:700}.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px}.filter-grid label{display:flex;align-items:center;gap:5px;color:var(--color-text-secondary);font-size:11px}.filter-grid .field{min-width:0;flex:1}.field.small{width:55px}.mt{margin-top:12px}.pager{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px}.empty{text-align:center;color:var(--color-text-secondary);padding:15px}@media(max-width:900px){.window-grid,.history-window-grid{grid-template-columns:1fr}.candidate-grid{grid-template-columns:repeat(7,1fr)}}@media(max-width:640px){.level-row{grid-template-columns:32px 1fr}.source-controls{grid-column:2}.candidate-grid{grid-template-columns:repeat(4,1fr)}}
+.sortable{cursor:pointer;user-select:none}.sort-mark{display:inline-block;width:14px;text-align:center}
 </style>
