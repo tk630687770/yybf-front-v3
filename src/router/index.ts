@@ -10,6 +10,7 @@ import HistoricalReplayLab from '../views/HistoricalReplayLab.vue';
 import EntryRecallLab from '../views/EntryRecallLab.vue';
 import BlueDecisionConsole from '../views/BlueDecisionConsole.vue';
 import RedDecisionConsole from '../views/RedDecisionConsole.vue';
+import RepeatPositionDecisionConsole from '../views/RepeatPositionDecisionConsole.vue';
 
 /**
  * 路由配置数组
@@ -67,6 +68,12 @@ const routes: RouteRecordRaw[] = [
     name: 'RedDecisionConsole',              // 红球决策台路由名称
     component: RedDecisionConsole,           // 红球窗口人工决策组件
     meta: { title: '红球决策台' }             // 页面标题
+  },
+  {
+    path: '/repeat-position-decision-console',
+    name: 'RepeatPositionDecisionConsole',
+    component: RepeatPositionDecisionConsole,
+    meta: { title: '重红决策台' }
   },
   {
     path: '/model-dashboard',          // 旧模型结果台路径

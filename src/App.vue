@@ -70,6 +70,13 @@
           >
             红球决策台
           </RouterLink>
+          <RouterLink
+            to="/repeat-position-decision-console"
+            class="nav-link"
+            active-class="nav-link-active"
+          >
+            重红决策台
+          </RouterLink>
         </nav>
       </div>
     </header>
