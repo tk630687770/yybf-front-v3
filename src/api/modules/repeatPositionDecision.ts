@@ -7,6 +7,14 @@ export interface LevelInfo {
   willDownPositions: string[];
 }
 
+export interface RepeatPositionWindow {
+  windowCode: string;
+  windowName: string;
+  windowSize: number;
+  stateText: string;
+  levels: LevelInfo[];
+}
+
 export interface HistoryState {
   completedState: string;
   totalCount: number;
@@ -19,9 +27,8 @@ export interface HistoryState {
 export interface PrepareResult {
   predictQiHao: string;
   sourceQiHao: string | null;
-  baseState: string;
-  levels: LevelInfo[];
-  historyStates: HistoryState[];
+  windows: RepeatPositionWindow[];
+  historyStats: Record<string, HistoryState[]>;
   actualHitPositions: string[];
 }
 
